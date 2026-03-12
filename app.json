@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "CRAVR",
+    "slug": "cravr",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFF8F3"
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.andreabarrameda.cravr"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFF8F3"
+      },
+      "package": "com.andreabarrameda.cravr"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
