@@ -12,6 +12,7 @@ import { RootStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import * as Location from 'expo-location';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RestaurantDiscovery'>;
 
@@ -30,16 +31,35 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   const { setState } = useAppState();
   const [loading, setLoading] = useState(true);
   const [restaurants, setRestaurants] = useState<RestaurantCard[]>([]);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
-    // For prototype use a fixed location; later use device location
+    // Request the device location and fall back to Los Angeles if access is unavailable
     const fetchData = async () => {
+      setLoading(true);
+      let lat = 34.0522;
+      let lng = -118.2437;
+      setLocationError(null);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === Location.PermissionStatus.GRANTED) {
+          const position = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Lowest
+          });
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+        } else {
+          setLocationError('Location permission denied. Showing nearby Los Angeles matches.');
+        }
+      } catch (error) {
+        setLocationError('Unable to read your current location. Showing default Los Angeles matches.');
+      }
       try {
         const data = await api.discoverRestaurants({
           craving_id: cravingId,
           cuisine,
-          lat: 34.0522,
-          lng: -118.2437
+          lat,
+          lng
         });
         setRestaurants(data.results);
       } catch (e) {
@@ -65,6 +85,9 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
     <ScreenContainer>
       <Text style={styles.title}>Matches near you</Text>
       <Text style={styles.subtitle}>{cuisine} • based on your craving</Text>
+      {locationError ? (
+        <Text style={styles.locationError}>{locationError}</Text>
+      ) : null}
 
       {loading ? (
         <View style={styles.loading}>
@@ -116,6 +139,11 @@ const styles = StyleSheet.create({
     color: '#6B6B6B',
     marginBottom: 16
   },
+  locationError: {
+    fontSize: 12,
+    color: '#FF6A2A',
+    marginBottom: 12
+  },
   listContent: {
     paddingTop: 8,
     paddingBottom: 24,
@@ -164,4 +192,3 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   }
 });
-
