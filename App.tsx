@@ -6,6 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SplashCravingScreen } from './src/screens/SplashCravingScreen';
 import { CuisineSelectionScreen } from './src/screens/CuisineSelectionScreen';
+import { TasteAttributesScreen } from './src/screens/TasteAttributesScreen';
+import { DishDiscoveryScreen } from './src/screens/DishDiscoveryScreen';
 import { RestaurantDiscoveryScreen } from './src/screens/RestaurantDiscoveryScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import { SoloCheckScreen } from './src/screens/SoloCheckScreen';
@@ -21,8 +23,26 @@ import { getLocationWithUserConsent } from './src/services/locationService';
 export type RootStackParamList = {
   SplashCraving: undefined;
   CuisineSelection: { cravingId: string };
+  TasteAttributes: { cravingId: string; cuisine: string };
+  DishDiscovery: {
+    cravingId: string;
+    cuisine: string;
+    attributes: {
+      temperature: string | null;
+      flavor: string | null;
+      texture: string | null;
+      intensity: string | null;
+      occasion: string | null;
+      budget: string | null;
+    };
+  };
   RestaurantDiscovery: { cravingId: string; cuisine: string };
-  RestaurantDetail: { restaurantId: string; cravingId: string; cuisine: string };
+  RestaurantDetail: {
+    restaurantId: string;
+    cravingId: string;
+    cuisine: string;
+    dishId?: string;
+  };
   SoloCheck: {
     restaurantId: string;
     dishId?: string;
@@ -129,6 +149,8 @@ function AppContent() {
         >
           <Stack.Screen name="SplashCraving" component={SplashCravingScreen} />
           <Stack.Screen name="CuisineSelection" component={CuisineSelectionScreen} />
+          <Stack.Screen name="TasteAttributes" component={TasteAttributesScreen} />
+          <Stack.Screen name="DishDiscovery" component={DishDiscoveryScreen} />
           <Stack.Screen name="RestaurantDiscovery" component={RestaurantDiscoveryScreen} />
           <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
           <Stack.Screen name="SoloCheck" component={SoloCheckScreen} />

@@ -71,6 +71,30 @@ export const api = {
     return request(`/discovery/restaurants/${placeId}`);
   },
 
+  discoverDishesByAttributes(params: {
+    craving_id: string;
+    cuisine: string;
+    attributes: {
+      temperature: string | null;
+      flavor: string | null;
+      texture: string | null;
+      intensity: string | null;
+      occasion: string | null;
+      budget: string | null;
+    };
+    location: { lat: number; lng: number };
+  }) {
+    return request('/discovery/dishes-by-attributes', {
+      method: 'POST',
+      body: JSON.stringify({
+        craving_id: params.craving_id,
+        cuisine: params.cuisine,
+        attributes: params.attributes,
+        location: params.location
+      })
+    });
+  },
+
   createSoloSession(body: any) {
     return request('/solo-sessions', {
       method: 'POST',
