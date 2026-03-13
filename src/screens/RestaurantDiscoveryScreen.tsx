@@ -5,7 +5,8 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
@@ -82,6 +83,12 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
               style={styles.card}
               onPress={() => onSelect(item.restaurant_id)}
             >
+              {item.hero_photo_url && (
+                <Image
+                  source={{ uri: item.hero_photo_url }}
+                  style={styles.cardImage}
+                />
+              )}
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardMeta}>
@@ -132,15 +139,22 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
-    padding: 16,
     marginBottom: 12,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 3
   },
-  cardBody: {},
+  cardImage: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#F0F0F0'
+  },
+  cardBody: {
+    padding: 16
+  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
