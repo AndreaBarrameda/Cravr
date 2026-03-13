@@ -44,20 +44,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
-
-  // Mock restaurant data - in a real app, this would come from the API
-  const restaurantData: RestaurantData = {
-    restaurant_id: restaurantId,
-    name: 'Phát Phố',
-    hero_photo_url: 'https://images.unsplash.com/photo-1555939594-58d7cb561f1f?w=500&h=500&fit=crop',
-    rating: 4.4,
-    price_level: 1,
-    address: '123 Main St, Los Angeles, CA 90001',
-    phone: '(213) 555-1234',
-    hours: '11:00 AM - 11:00 PM',
-    distance_meters: 2500,
-    vibe_tags: ['Authentic', 'Casual']
-  };
+  const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,22 +52,32 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         const lat = state.location?.latitude ?? 34.0522;
         const lng = state.location?.longitude ?? -118.2437;
 
-        const data = await api.discoverDishes({
+        // Extract place_id from restaurant_id (format: rst_<place_id>)
+        const placeId = restaurantId.replace(/^rst_/, '');
+
+        // Fetch restaurant details
+        const detailsData = await api.getRestaurantDetails(placeId);
+        if (detailsData) {
+          setRestaurantData(detailsData);
+        }
+
+        // Fetch dishes
+        const dishesData = await api.discoverDishes({
           restaurant_id: restaurantId,
           craving_id: cravingId,
           lat,
           lng
         });
 
-        if (data.results && Array.isArray(data.results)) {
-          setDishes(data.results);
-          if (data.results.length > 0) {
-            setSelectedDish(data.results[0]);
+        if (dishesData.results && Array.isArray(dishesData.results)) {
+          setDishes(dishesData.results);
+          if (dishesData.results.length > 0) {
+            setSelectedDish(dishesData.results[0]);
           }
         }
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error('Failed to fetch dishes:', e);
+        console.error('Failed to fetch restaurant data:', e);
       } finally {
         setLoading(false);
       }
@@ -114,99 +111,108 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   return (
     <ScrollView style={styles.container}>
       <ScreenContainer>
-        {/* Restaurant Header */}
-        {restaurantData.hero_photo_url && (
-          <Image
-            source={{ uri: restaurantData.hero_photo_url }}
-            style={styles.heroImage}
-          />
+        {restaurantData ? (
+          <>
+            {/* Restaurant Header */}
+            {restaurantData.hero_photo_url && (
+              <Image
+                source={{ uri: restaurantData.hero_photo_url }}
+                style={styles.heroImage}
+              />
+            )}
+
+            <View style={styles.header}>
+              <Text style={styles.restaurantName}>{restaurantData.name}</Text>
+              <View style={styles.ratingRow}>
+                <Text style={styles.rating}>
+                  {restaurantData.rating} ★ • {'$'.repeat(restaurantData.price_level)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Location & Hours */}
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>📍 Location</Text>
+                <Text style={styles.infoValue}>{restaurantData.address}</Text>
+              </View>
+              <View style={[styles.infoRow, { marginTop: 12 }]}>
+                <Text style={styles.infoLabel}>📞 Phone</Text>
+                <Text style={styles.infoValue}>{restaurantData.phone}</Text>
+              </View>
+              {restaurantData.hours && restaurantData.hours.length > 0 && (
+                <View style={[styles.infoRow, { marginTop: 12 }]}>
+                  <Text style={styles.infoLabel}>🕐 Hours</Text>
+                  <Text style={styles.infoValue}>
+                    {restaurantData.hours[new Date().getDay()] || 'See website for hours'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </>
+        ) : (
+          <View style={styles.loadingPlaceholder}>
+            <ActivityIndicator color="#FF6A2A" />
+            <Text style={styles.loadingText}>Loading restaurant info...</Text>
+          </View>
         )}
 
-        <View style={styles.header}>
-          <Text style={styles.restaurantName}>{restaurantData.name}</Text>
-          <View style={styles.ratingRow}>
-            <Text style={styles.rating}>
-              {restaurantData.rating} ★ • {'$'.repeat(restaurantData.price_level)}
-            </Text>
-          </View>
-        </View>
+            {/* Menu Items */}
+            <View style={styles.menuSection}>
+              <Text style={styles.sectionTitle}>Recommended Dishes</Text>
 
-        {/* Location & Hours */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>📍 Location</Text>
-            <Text style={styles.infoValue}>{restaurantData.address}</Text>
-          </View>
-          <View style={[styles.infoRow, { marginTop: 12 }]}>
-            <Text style={styles.infoLabel}>🕐 Hours</Text>
-            <Text style={styles.infoValue}>{restaurantData.hours}</Text>
-          </View>
-          <View style={[styles.infoRow, { marginTop: 12 }]}>
-            <Text style={styles.infoLabel}>📞 Phone</Text>
-            <Text style={styles.infoValue}>{restaurantData.phone}</Text>
-          </View>
-          <View style={[styles.infoRow, { marginTop: 12 }]}>
-            <Text style={styles.infoLabel}>📏 Distance</Text>
-            <Text style={styles.infoValue}>
-              {(restaurantData.distance_meters / 1000).toFixed(1)} km away
-            </Text>
-          </View>
-        </View>
-
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Recommended Dishes</Text>
-
-          {dishes.length > 0 ? (
-            dishes.map((dish) => (
-              <TouchableOpacity
-                key={dish.dish_id}
-                style={[
-                  styles.dishCard,
-                  selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
-                ]}
-                onPress={() => setSelectedDish(dish)}
-              >
-                {dish.photo_url && (
-                  <Image
-                    source={{ uri: dish.photo_url }}
-                    style={styles.dishImage}
-                  />
-                )}
-                <View style={styles.dishInfo}>
-                  <View style={styles.dishHeader}>
-                    <Text style={styles.dishName}>{dish.name}</Text>
-                    <Text style={styles.dishPrice}>
-                      ${dish.price.toFixed(2)}
-                    </Text>
-                  </View>
-                  <Text style={styles.dishDescription} numberOfLines={2}>
-                    {dish.description}
+              {dishes.length > 0 ? (
+                dishes.map((dish) => (
+                  <TouchableOpacity
+                    key={dish.dish_id}
+                    style={[
+                      styles.dishCard,
+                      selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
+                    ]}
+                    onPress={() => setSelectedDish(dish)}
+                  >
+                    {dish.photo_url && (
+                      <Image
+                        source={{ uri: dish.photo_url }}
+                        style={styles.dishImage}
+                      />
+                    )}
+                    <View style={styles.dishInfo}>
+                      <View style={styles.dishHeader}>
+                        <Text style={styles.dishName}>{dish.name}</Text>
+                        <Text style={styles.dishPrice}>
+                          ${dish.price.toFixed(2)}
+                        </Text>
+                      </View>
+                      <Text style={styles.dishDescription} numberOfLines={2}>
+                        {dish.description}
+                      </Text>
+                      <View style={styles.matchScore}>
+                        <Text style={styles.matchScoreText}>
+                          ✨ {Math.round(dish.match_score * 100)}% match
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyText}>
+                    No recommended dishes available
                   </Text>
-                  <View style={styles.matchScore}>
-                    <Text style={styles.matchScoreText}>
-                      ✨ {Math.round(dish.match_score * 100)}% match
-                    </Text>
-                  </View>
                 </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No recommended dishes available
-              </Text>
+              )}
             </View>
-          )}
-        </View>
 
-        {/* Continue Button */}
-        <View style={styles.footer}>
-          <CravrButton
-            label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
-            onPress={onContinue}
-          />
-        </View>
+            {/* Continue Button */}
+            <View style={styles.footer}>
+              <CravrButton
+                label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
+                onPress={onContinue}
+              />
+            </View>
+          </>
+        )}
       </ScreenContainer>
     </ScrollView>
   );
@@ -221,6 +227,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  loadingPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B6B6B'
   },
   heroImage: {
     width: '100%',

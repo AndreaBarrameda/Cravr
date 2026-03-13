@@ -67,6 +67,10 @@ export const api = {
     });
   },
 
+  getRestaurantDetails(placeId: string) {
+    return request(`/discovery/restaurants/${placeId}`);
+  },
+
   createSoloSession(body: any) {
     return request('/solo-sessions', {
       method: 'POST',
