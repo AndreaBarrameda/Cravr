@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/build/
+*.log
+*.lock
+.DS_Store
+*.tmp
+local.properties
+env/local.properties
+.env*
