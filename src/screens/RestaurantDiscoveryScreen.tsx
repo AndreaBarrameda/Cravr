@@ -24,6 +24,7 @@ type RestaurantCard = {
   rating: number;
   price_level: number;
   vibe_tags: string[];
+  match_reason?: string;
 };
 
 export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
@@ -95,6 +96,9 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
                   {item.rating ? `${item.rating.toFixed(1)} ★` : 'New'} •{' '}
                   {'$'.repeat(item.price_level || 1)}
                 </Text>
+                {item.match_reason && (
+                  <Text style={styles.cardReason}>{item.match_reason}</Text>
+                )}
                 {item.vibe_tags?.length ? (
                   <View style={styles.chipRow}>
                     {item.vibe_tags.slice(0, 2).map((tag) => (
@@ -164,6 +168,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B6B6B',
     marginBottom: 8
+  },
+  cardReason: {
+    fontSize: 13,
+    color: '#FF6A2A',
+    fontWeight: '500',
+    marginBottom: 8,
+    fontStyle: 'italic'
   },
   chipRow: {
     flexDirection: 'row',
