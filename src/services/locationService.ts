@@ -1,4 +1,4 @@
-import { Geolocation } from 'react-native';
+import * as Location from 'expo-location';
 
 export type LocationData = {
   latitude: number;
@@ -7,6 +7,13 @@ export type LocationData = {
 };
 
 const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+// Default Cebu location for fallback
+const DEFAULT_LOCATION: LocationData = {
+  latitude: 10.3157,
+  longitude: 123.8854,
+  address: 'Cebu, Philippines'
+};
 
 async function reverseGeocodeWithGoogleMaps(
   latitude: number,
@@ -34,29 +41,70 @@ async function reverseGeocodeWithGoogleMaps(
 }
 
 export async function requestLocationPermission(): Promise<boolean> {
-  return true;
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('Error requesting location permission:', error);
+    return false;
+  }
 }
 
 export async function checkLocationPermission(): Promise<boolean> {
-  return true;
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('Error checking location permission:', error);
+    return false;
+  }
 }
 
-// Default Cebu location for fallback
-const DEFAULT_LOCATION: LocationData = {
-  latitude: 10.3157,
-  longitude: 123.8854,
-  address: 'Cebu, Philippines'
-};
-
 export async function getCurrentLocation(): Promise<LocationData | null> {
-  // For now, just return default location (Cebu)
-  // TODO: Fix Geolocation API to fetch real user location
-  return DEFAULT_LOCATION;
+  try {
+    const hasPermission = await checkLocationPermission();
+    if (!hasPermission) {
+      console.warn('Location permission not granted, using default location');
+      return DEFAULT_LOCATION;
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced
+    });
+
+    const address = await reverseGeocodeWithGoogleMaps(
+      location.coords.latitude,
+      location.coords.longitude
+    );
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      address
+    };
+  } catch (error) {
+    console.error('Error getting current location:', error);
+    return DEFAULT_LOCATION;
+  }
 }
 
 export async function getLocationWithUserConsent(
   onPermissionRequest?: () => Promise<boolean>
 ): Promise<LocationData | null> {
-  // User already enabled location via iOS/Android permission dialog
-  return getCurrentLocation();
+  try {
+    const hasPermission = await checkLocationPermission();
+
+    if (!hasPermission) {
+      const granted = await requestLocationPermission();
+      if (!granted) {
+        console.warn('User denied location permission, using default location');
+        return DEFAULT_LOCATION;
+      }
+    }
+
+    return getCurrentLocation();
+  } catch (error) {
+    console.error('Error getting location with user consent:', error);
+    return DEFAULT_LOCATION;
+  }
 }

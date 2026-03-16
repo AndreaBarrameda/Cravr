@@ -11,6 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
+import { requestLocationPermission, getLocationWithUserConsent } from '../services/locationService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingProfile'>;
 
@@ -18,11 +19,17 @@ export function OnboardingProfileScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const { setState } = useAppState();
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (!name.trim()) return;
+
+    // Request location permission before completing onboarding
+    await requestLocationPermission();
+    const location = await getLocationWithUserConsent();
+
     setState((prev) => ({
       ...prev,
       userProfile: { name: name.trim() },
+      location,
       onboardingComplete: true
     }));
     navigation.navigate('SplashCraving');

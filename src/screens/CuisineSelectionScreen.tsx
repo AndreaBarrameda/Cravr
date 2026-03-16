@@ -27,7 +27,7 @@ export function CuisineSelectionScreen({ navigation }: Props) {
 
   const onSelect = (slug: string) => {
     setState((prev) => ({ ...prev, selectedCuisine: slug }));
-    navigation.navigate('TasteAttributes', {
+    navigation.navigate('RestaurantDiscovery', {
       cravingId: state.craving!.craving_id,
       cuisine: slug
     });

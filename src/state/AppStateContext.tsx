@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { getLocationWithUserConsent } from '../services/locationService';
 
 type CravingStruct = {
   craving_id: string;
@@ -40,6 +41,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const setState = (updater: (prev: AppState) => AppState) => {
     setInternalState((prev) => updater(prev));
   };
+
+  useEffect(() => {
+    const initializeLocation = async () => {
+      try {
+        const location = await getLocationWithUserConsent();
+        if (location) {
+          setState((prev) => ({ ...prev, location }));
+        }
+      } catch (error) {
+        console.error('Failed to initialize location:', error);
+      }
+    };
+
+    initializeLocation();
+  }, []);
 
   return (
     <AppStateContext.Provider value={{ state, setState }}>
