@@ -46,10 +46,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const initializeLocation = async () => {
       try {
         const location = await getLocationWithUserConsent();
+        // eslint-disable-next-line no-console
+        console.log('📍 Location initialized in AppStateContext:', location);
         if (location) {
           setState((prev) => ({ ...prev, location }));
         }
       } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Failed to initialize location:', error);
       }
     };

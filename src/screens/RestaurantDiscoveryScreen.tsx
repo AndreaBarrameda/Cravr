@@ -36,9 +36,14 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Use device location from app state, fallback to LA for testing
-        const lat = state.location?.latitude ?? 34.0522;
-        const lng = state.location?.longitude ?? -118.2437;
+        // Use device location from app state, fallback to Cebu for testing
+        const lat = state.location?.latitude ?? 10.3157;
+        const lng = state.location?.longitude ?? 123.8854;
+
+        // eslint-disable-next-line no-console
+        console.log('🍽️ Restaurant discovery location:', { lat, lng });
+        // eslint-disable-next-line no-console
+        console.log('📍 Full app location state:', state.location);
 
         const data = await api.discoverRestaurants({
           craving_id: cravingId,

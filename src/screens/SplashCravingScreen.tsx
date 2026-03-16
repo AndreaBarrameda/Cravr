@@ -28,6 +28,11 @@ export function SplashCravingScreen({ navigation }: Props) {
         ? { lat: state.location.latitude, lng: state.location.longitude }
         : undefined;
 
+      // eslint-disable-next-line no-console
+      console.log('🔍 Using location:', location);
+      // eslint-disable-next-line no-console
+      console.log('📍 Full location data:', state.location);
+
       const result = await api.resolveCraving(text.trim(), location);
       setState((prev) => ({
         ...prev,

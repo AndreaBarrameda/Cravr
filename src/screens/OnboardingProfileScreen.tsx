@@ -22,9 +22,17 @@ export function OnboardingProfileScreen({ navigation }: Props) {
   const handleDone = async () => {
     if (!name.trim()) return;
 
+    // eslint-disable-next-line no-console
+    console.log('🎯 Starting location request in onboarding...');
+
     // Request location permission before completing onboarding
-    await requestLocationPermission();
+    const permissionGranted = await requestLocationPermission();
+    // eslint-disable-next-line no-console
+    console.log('📍 Permission granted:', permissionGranted);
+
     const location = await getLocationWithUserConsent();
+    // eslint-disable-next-line no-console
+    console.log('📍 Location obtained in onboarding:', location);
 
     setState((prev) => ({
       ...prev,
