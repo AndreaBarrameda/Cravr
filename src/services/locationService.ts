@@ -76,8 +76,16 @@ async function getNativeLocation(): Promise<LocationData | null> {
   try {
     if (!Location) return DEFAULT_LOCATION;
 
+    // Request permission first
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      console.warn('Location permission not granted');
+      return DEFAULT_LOCATION;
+    }
+
     const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
+      accuracy: Location.Accuracy.Balanced,
+      timeoutMillis: 5000
     });
 
     const address = await reverseGeocodeWithGoogleMaps(
