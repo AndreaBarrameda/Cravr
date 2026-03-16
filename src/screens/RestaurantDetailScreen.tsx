@@ -149,6 +149,61 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                 </View>
               )}
             </View>
+
+            {/* Menu Items */}
+            <View style={styles.menuSection}>
+              <Text style={styles.sectionTitle}>Recommended Dishes</Text>
+
+              {dishes.length > 0 ? (
+                dishes.map((dish) => (
+                  <TouchableOpacity
+                    key={dish.dish_id}
+                    style={[
+                      styles.dishCard,
+                      selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
+                    ]}
+                    onPress={() => setSelectedDish(dish)}
+                  >
+                    {dish.photo_url && (
+                      <Image
+                        source={{ uri: dish.photo_url }}
+                        style={styles.dishImage}
+                      />
+                    )}
+                    <View style={styles.dishInfo}>
+                      <View style={styles.dishHeader}>
+                        <Text style={styles.dishName}>{dish.name}</Text>
+                        <Text style={styles.dishPrice}>
+                          ${dish.price.toFixed(2)}
+                        </Text>
+                      </View>
+                      <Text style={styles.dishDescription} numberOfLines={2}>
+                        {dish.description}
+                      </Text>
+                      <View style={styles.matchScore}>
+                        <Text style={styles.matchScoreText}>
+                          ✨ {Math.round(dish.match_score * 100)}% match
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyText}>
+                    No recommended dishes available
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Continue Button */}
+            <View style={styles.footer}>
+              <CravrButton
+                label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
+                onPress={onContinue}
+              />
+            </View>
           </>
         ) : (
           <View style={styles.loadingPlaceholder}>
@@ -156,61 +211,6 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             <Text style={styles.loadingText}>Loading restaurant info...</Text>
           </View>
         )}
-
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Recommended Dishes</Text>
-
-          {dishes.length > 0 ? (
-            dishes.map((dish) => (
-              <TouchableOpacity
-                key={dish.dish_id}
-                style={[
-                  styles.dishCard,
-                  selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
-                ]}
-                onPress={() => setSelectedDish(dish)}
-              >
-                {dish.photo_url && (
-                  <Image
-                    source={{ uri: dish.photo_url }}
-                    style={styles.dishImage}
-                  />
-                )}
-                <View style={styles.dishInfo}>
-                  <View style={styles.dishHeader}>
-                    <Text style={styles.dishName}>{dish.name}</Text>
-                    <Text style={styles.dishPrice}>
-                      ${dish.price.toFixed(2)}
-                    </Text>
-                  </View>
-                  <Text style={styles.dishDescription} numberOfLines={2}>
-                    {dish.description}
-                  </Text>
-                  <View style={styles.matchScore}>
-                    <Text style={styles.matchScoreText}>
-                      ✨ {Math.round(dish.match_score * 100)}% match
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No recommended dishes available
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Continue Button */}
-        <View style={styles.footer}>
-          <CravrButton
-            label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
-            onPress={onContinue}
-          />
-        </View>
       </ScreenContainer>
     </ScrollView>
   );
