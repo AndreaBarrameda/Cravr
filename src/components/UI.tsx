@@ -50,6 +50,7 @@ export function ScreenContainer({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    flexDirection: 'column',
     backgroundColor: '#FFF8F3',
     paddingHorizontal: 20,
     paddingTop: 60,

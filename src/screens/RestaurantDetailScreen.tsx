@@ -149,13 +149,6 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                 </View>
               )}
             </View>
-          </>
-        ) : (
-          <View style={styles.loadingPlaceholder}>
-            <ActivityIndicator color="#FF6A2A" />
-            <Text style={styles.loadingText}>Loading restaurant info...</Text>
-          </View>
-        )}
 
             {/* Menu Items */}
             <View style={styles.menuSection}>
@@ -212,6 +205,11 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
               />
             </View>
           </>
+        ) : (
+          <View style={styles.loadingPlaceholder}>
+            <ActivityIndicator color="#FF6A2A" />
+            <Text style={styles.loadingText}>Loading restaurant info...</Text>
+          </View>
         )}
       </ScreenContainer>
     </ScrollView>

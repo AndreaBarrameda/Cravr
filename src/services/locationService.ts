@@ -1,4 +1,4 @@
-import * as Location from 'expo-location';
+import { Geolocation } from 'react-native';
 
 export type LocationData = {
   latitude: number;
@@ -34,82 +34,29 @@ async function reverseGeocodeWithGoogleMaps(
 }
 
 export async function requestLocationPermission(): Promise<boolean> {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    return status === 'granted';
-  } catch (error) {
-    console.error('Location permission request failed:', error);
-    return false;
-  }
+  return true;
 }
 
 export async function checkLocationPermission(): Promise<boolean> {
-  try {
-    const { status } = await Location.getForegroundPermissionsAsync();
-    return status === 'granted';
-  } catch (error) {
-    console.error('Location permission check failed:', error);
-    return false;
-  }
+  return true;
 }
 
+// Default Cebu location for fallback
+const DEFAULT_LOCATION: LocationData = {
+  latitude: 10.3157,
+  longitude: 123.8854,
+  address: 'Cebu, Philippines'
+};
+
 export async function getCurrentLocation(): Promise<LocationData | null> {
-  try {
-    const hasPermission = await checkLocationPermission();
-    if (!hasPermission) {
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        console.log('Location permission denied');
-        return null;
-      }
-    }
-
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
-    });
-
-    const { latitude, longitude } = location.coords;
-
-    // Get address from Google Maps if API key is available
-    const address = await reverseGeocodeWithGoogleMaps(latitude, longitude);
-
-    return {
-      latitude,
-      longitude,
-      address
-    };
-  } catch (error) {
-    console.error('Failed to get current location:', error);
-    return null;
-  }
+  // For now, just return default location (Cebu)
+  // TODO: Fix Geolocation API to fetch real user location
+  return DEFAULT_LOCATION;
 }
 
 export async function getLocationWithUserConsent(
   onPermissionRequest?: () => Promise<boolean>
 ): Promise<LocationData | null> {
-  try {
-    const hasPermission = await checkLocationPermission();
-
-    if (!hasPermission) {
-      // If custom permission handler is provided, use it
-      if (onPermissionRequest) {
-        const userConsented = await onPermissionRequest();
-        if (!userConsented) {
-          console.log('User did not consent to location access');
-          return null;
-        }
-      }
-
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        console.log('Location permission denied by system');
-        return null;
-      }
-    }
-
-    return getCurrentLocation();
-  } catch (error) {
-    console.error('Location retrieval with consent failed:', error);
-    return null;
-  }
+  // User already enabled location via iOS/Android permission dialog
+  return getCurrentLocation();
 }

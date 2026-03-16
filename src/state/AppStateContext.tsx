@@ -22,6 +22,9 @@ type AppState = {
   soloSessionId?: string;
   matchId?: string;
   reservationId?: string;
+  onboardingComplete?: boolean;
+  preferences?: string[];
+  userProfile?: { name: string };
 };
 
 type AppStateContextValue = {
