@@ -167,7 +167,11 @@ export async function generateRestaurantDescription(
   priceLevel: number,
   cravingText: string,
   attributes: Record<string, string | null>,
-  rating: number
+  rating: number,
+  reviewCount: number = 0,
+  hasPhotos: boolean = false,
+  hasWebsite: boolean = false,
+  isOpenNow?: boolean
 ): Promise<RestaurantDescription> {
   if (!openai) {
     // eslint-disable-next-line no-console
@@ -184,24 +188,37 @@ export async function generateRestaurantDescription(
   }
 
   try {
-    const prompt = `You are a food critic and restaurant expert. Provide a detailed description of a restaurant.
+    // Build restaurant context string with actual data
+    const ratingContext = rating >= 4.5 ? 'top-rated' : rating >= 4.0 ? 'highly-rated' : rating >= 3.5 ? 'well-reviewed' : 'popular';
+    const priceContext = priceLevel === 1 ? 'budget-friendly' : priceLevel === 2 ? 'reasonably-priced' : priceLevel === 3 ? 'upscale' : 'premium';
+    const popularityContext = reviewCount > 500 ? 'very popular (500+ reviews)' : reviewCount > 100 ? 'popular (100+ reviews)' : reviewCount > 0 ? 'growing in popularity' : 'new spot';
+    const establishedContext = hasWebsite ? 'established with online presence' : hasPhotos ? 'established with good visuals' : 'emerging';
+    const openStatus = isOpenNow === true ? '(currently open)' : isOpenNow === false ? '(currently closed)' : '';
 
-Restaurant: "${restaurantName}"
-Cuisine: ${cuisineTypes.join(', ')}
-Rating: ${rating}/5
-Price Level: ${priceLevel}/4
+    const prompt = `You are a food critic and restaurant expert. Interpret THIS SPECIFIC RESTAURANT's characteristics and provide a personalized description.
+
+ACTUAL RESTAURANT DATA:
+Restaurant Name: "${restaurantName}"
+Cuisine Types: ${cuisineTypes.join(', ')}
+Rating: ${rating}/5 (${ratingContext})
+Reviews: ${reviewCount > 0 ? popularityContext : 'unreviewed (new)'}
+Price Level: ${priceContext}
+Status: ${establishedContext} ${openStatus}
 User's Craving: "${cravingText || 'general food exploration'}"
 User Preferences: ${JSON.stringify(attributes)}
 
-Generate a response that includes:
-1. tagline: A SHORT 1-2 sentence punchy description for the restaurant card (e.g., "Top-rated thai, reasonably-priced authentic spot" or "Cozy italian gem with homemade pasta")
-2. atmosphere: 1-2 sentence description of the restaurant's vibe and ambiance
-3. why_match: 1-2 sentences explaining why this restaurant is perfect for the user's craving/preferences
-4. vibe: 1 short sentence capturing the restaurant's essence
-5. best_for: Who would enjoy this restaurant most (e.g., "Groups", "Dates", "Business meetings", "Families")
-6. suggested_dishes: 3-5 specific, realistic dish names the user should definitely try at this restaurant
+Based on THESE ACTUAL DETAILS about the restaurant, generate personalized responses:
 
-For the tagline, use a mix of: rating quality (great/top-rated/hidden gem), cuisine type, and key characteristic (authentic/reasonably-priced/cozy/trendy).`;
+1. tagline: A SHORT 1-2 sentence punchy description UNIQUE to this specific restaurant using its real characteristics
+   - Include: rating quality + cuisine + ONE unique trait (popularity, establishment, price, specialty)
+   - Examples: "Hidden gem Vietnamese spot, new but highly-rated" OR "Established Thai favorite (400+ reviews), consistent quality"
+2. atmosphere: 1-2 sentence description of the restaurant's likely vibe based on its profile
+3. why_match: 1-2 sentences explaining why this specific restaurant is perfect for the user's craving/preferences
+4. vibe: 1 short sentence capturing the restaurant's essence
+5. best_for: Who would enjoy this restaurant most based on its characteristics
+6. suggested_dishes: 3-5 specific, realistic dish names for THIS cuisine type
+
+Make taglines UNIQUE per restaurant - interpret its characteristics (popularity, establishment, rating, price) to create specific taglines.`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

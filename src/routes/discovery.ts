@@ -147,7 +147,11 @@ discoveryRouter.post('/restaurants', async (req, res) => {
           r.price_level ?? 2,
           '',
           {},
-          r.rating || 4.0
+          r.rating || 4.0,
+          r.user_ratings_total || 0,
+          (r.photos?.length || 0) > 0,
+          false, // website info not available in nearbySearch
+          undefined // open status not available in nearbySearch
         );
 
         return {
@@ -381,7 +385,11 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
               r.price_level ?? 2,
               craving_text ?? '',
               attributes ?? {},
-              r.rating || 4.0
+              r.rating || 4.0,
+              r.user_ratings_total || 0,
+              (r.photos?.length || 0) > 0,
+              false, // website info not available in nearbySearch
+              undefined // open status not available in nearbySearch
             );
             cacheDescription(restaurantId, restaurantDescription);
           }
