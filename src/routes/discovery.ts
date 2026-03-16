@@ -163,7 +163,7 @@ discoveryRouter.post('/restaurants', async (req, res) => {
                 r.photos[0].photo_reference
               }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
             : null,
-          match_reason,
+          match_reason: description.tagline, // Use AI tagline instead of generic reason
           rating: r.rating,
           price_level: r.price_level,
           vibe_tags: [],
@@ -447,7 +447,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                 restaurant_name: r.name,
                 rating: r.rating || 4.0,
                 match_score: dish.matchScore,
-                match_reason: `${dish.temperature === 'hot' ? '🔥' : '❄️'} ${dish.texture} ${dish.flavor} - ${dish.intensity} intensity`,
+                match_reason: restaurantDescription.tagline, // Use AI tagline as match reason
                 restaurant_description: {
                   tagline: restaurantDescription.tagline,
                   atmosphere: restaurantDescription.atmosphere,
