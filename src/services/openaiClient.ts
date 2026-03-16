@@ -153,6 +153,7 @@ export interface GeneratedDish {
 }
 
 export interface RestaurantDescription {
+  tagline: string;              // Short one-liner for card (orange text) - max 2 sentences
   atmosphere: string;           // "Cozy & intimate", "Lively & trendy", etc.
   why_match: string;            // Why it fits the user's craving
   suggested_dishes: string[];   // 3-5 specific dishes to order
@@ -173,6 +174,7 @@ export async function generateRestaurantDescription(
     console.error('[OpenAI] Client is not initialized. Check OPENAI_API_KEY environment variable.');
     // Return fallback description
     return {
+      tagline: `Great ${cuisineTypes[0] || 'dining'} spot, reasonably-priced`,
       atmosphere: 'Welcoming and comfortable dining experience',
       why_match: `A great spot for your ${cravingText || 'food'} craving`,
       suggested_dishes: ['House Special', 'Chef\'s Recommendation', 'Customer Favorite'],
@@ -192,13 +194,14 @@ User's Craving: "${cravingText || 'general food exploration'}"
 User Preferences: ${JSON.stringify(attributes)}
 
 Generate a response that includes:
-1. atmosphere: 1-2 sentence description of the restaurant's vibe and ambiance
-2. why_match: 1-2 sentences explaining why this restaurant is perfect for the user's craving/preferences
-3. vibe: 1 short sentence capturing the restaurant's essence
-4. best_for: Who would enjoy this restaurant most (e.g., "Groups", "Dates", "Business meetings", "Families")
-5. suggested_dishes: 3-5 specific, realistic dish names the user should definitely try at this restaurant
+1. tagline: A SHORT 1-2 sentence punchy description for the restaurant card (e.g., "Top-rated thai, reasonably-priced authentic spot" or "Cozy italian gem with homemade pasta")
+2. atmosphere: 1-2 sentence description of the restaurant's vibe and ambiance
+3. why_match: 1-2 sentences explaining why this restaurant is perfect for the user's craving/preferences
+4. vibe: 1 short sentence capturing the restaurant's essence
+5. best_for: Who would enjoy this restaurant most (e.g., "Groups", "Dates", "Business meetings", "Families")
+6. suggested_dishes: 3-5 specific, realistic dish names the user should definitely try at this restaurant
 
-Make it personal, specific, and convincing. Use the restaurant name and cuisine context to suggest authentic dishes.`;
+For the tagline, use a mix of: rating quality (great/top-rated/hidden gem), cuisine type, and key characteristic (authentic/reasonably-priced/cozy/trendy).`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -215,6 +218,7 @@ Make it personal, specific, and convincing. Use the restaurant name and cuisine 
           schema: {
             type: 'object',
             properties: {
+              tagline: { type: 'string' },
               atmosphere: { type: 'string' },
               why_match: { type: 'string' },
               vibe: { type: 'string' },
@@ -226,7 +230,7 @@ Make it personal, specific, and convincing. Use the restaurant name and cuisine 
                 maxItems: 5
               }
             },
-            required: ['atmosphere', 'why_match', 'vibe', 'best_for', 'suggested_dishes'],
+            required: ['tagline', 'atmosphere', 'why_match', 'vibe', 'best_for', 'suggested_dishes'],
             additionalProperties: false
           }
         }
@@ -244,6 +248,7 @@ Make it personal, specific, and convincing. Use the restaurant name and cuisine 
     console.warn('Failed to generate AI restaurant description:', e);
     // Return fallback description
     return {
+      tagline: `Great ${cuisineTypes[0] || 'dining'} spot, reasonably-priced`,
       atmosphere: 'Welcoming and comfortable dining experience',
       why_match: `A great spot for your ${cravingText || 'food'} craving`,
       suggested_dishes: ['House Special', 'Chef\'s Recommendation', 'Customer Favorite'],

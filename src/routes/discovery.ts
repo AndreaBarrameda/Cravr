@@ -164,6 +164,7 @@ discoveryRouter.post('/restaurants', async (req, res) => {
           price_level: r.price_level,
           vibe_tags: [],
           description: {
+            tagline: description.tagline,
             atmosphere: description.atmosphere,
             why_match: description.why_match,
             vibe: description.vibe,
@@ -440,6 +441,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                 match_score: dish.matchScore,
                 match_reason: `${dish.temperature === 'hot' ? '🔥' : '❄️'} ${dish.texture} ${dish.flavor} - ${dish.intensity} intensity`,
                 restaurant_description: {
+                  tagline: restaurantDescription.tagline,
                   atmosphere: restaurantDescription.atmosphere,
                   why_match: restaurantDescription.why_match,
                   vibe: restaurantDescription.vibe,
