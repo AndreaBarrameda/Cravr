@@ -1,4 +1,9 @@
-import * as Location from 'expo-location';
+import { Platform } from 'react-native';
+
+let Location: any = null;
+if (Platform.OS !== 'web') {
+  Location = require('expo-location');
+}
 
 export type LocationData = {
   latitude: number;
@@ -40,8 +45,64 @@ async function reverseGeocodeWithGoogleMaps(
   return undefined;
 }
 
+async function getWebLocation(): Promise<LocationData | null> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      console.warn('Geolocation not supported, using default location');
+      resolve(DEFAULT_LOCATION);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const address = await reverseGeocodeWithGoogleMaps(latitude, longitude);
+        resolve({
+          latitude,
+          longitude,
+          address
+        });
+      },
+      (error) => {
+        console.warn('Geolocation error:', error);
+        resolve(DEFAULT_LOCATION);
+      },
+      { timeout: 10000 }
+    );
+  });
+}
+
+async function getNativeLocation(): Promise<LocationData | null> {
+  try {
+    if (!Location) return DEFAULT_LOCATION;
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced
+    });
+
+    const address = await reverseGeocodeWithGoogleMaps(
+      location.coords.latitude,
+      location.coords.longitude
+    );
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      address
+    };
+  } catch (error) {
+    console.error('Error getting native location:', error);
+    return DEFAULT_LOCATION;
+  }
+}
+
 export async function requestLocationPermission(): Promise<boolean> {
   try {
+    if (Platform.OS === 'web') {
+      return true;
+    }
+    if (!Location) return false;
+
     const { status } = await Location.requestForegroundPermissionsAsync();
     return status === 'granted';
   } catch (error) {
@@ -52,6 +113,11 @@ export async function requestLocationPermission(): Promise<boolean> {
 
 export async function checkLocationPermission(): Promise<boolean> {
   try {
+    if (Platform.OS === 'web') {
+      return true;
+    }
+    if (!Location) return false;
+
     const { status } = await Location.getForegroundPermissionsAsync();
     return status === 'granted';
   } catch (error) {
@@ -68,20 +134,11 @@ export async function getCurrentLocation(): Promise<LocationData | null> {
       return DEFAULT_LOCATION;
     }
 
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
-    });
+    if (Platform.OS === 'web') {
+      return getWebLocation();
+    }
 
-    const address = await reverseGeocodeWithGoogleMaps(
-      location.coords.latitude,
-      location.coords.longitude
-    );
-
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      address
-    };
+    return getNativeLocation();
   } catch (error) {
     console.error('Error getting current location:', error);
     return DEFAULT_LOCATION;
