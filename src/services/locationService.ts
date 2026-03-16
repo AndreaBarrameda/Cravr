@@ -1,3 +1,5 @@
+import * as Location from 'expo-location';
+
 export type LocationData = {
   latitude: number;
   longitude: number;
@@ -39,56 +41,72 @@ async function reverseGeocodeWithGoogleMaps(
 }
 
 export async function requestLocationPermission(): Promise<boolean> {
-  console.log('📍 Requesting location permission via browser geolocation');
-  return true;
+  try {
+    console.log('📍 Requesting location permission');
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    const granted = status === 'granted';
+    console.log('📍 Permission granted:', granted);
+    return granted;
+  } catch (error) {
+    console.error('Error requesting permission:', error);
+    return false;
+  }
 }
 
 export async function checkLocationPermission(): Promise<boolean> {
-  return true;
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('Error checking permission:', error);
+    return false;
+  }
 }
 
 export async function getCurrentLocation(): Promise<LocationData | null> {
-  return new Promise((resolve) => {
-    console.log('📍 Getting current location via navigator.geolocation');
-
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      console.warn('Geolocation not supported, using default location');
-      resolve(DEFAULT_LOCATION);
-      return;
+  try {
+    console.log('📍 Getting current location');
+    const hasPermission = await checkLocationPermission();
+    if (!hasPermission) {
+      console.warn('Location permission not granted');
+      return DEFAULT_LOCATION;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log(`📍 Got location: ${latitude}, ${longitude}`);
-        const address = await reverseGeocodeWithGoogleMaps(latitude, longitude);
-        resolve({
-          latitude,
-          longitude,
-          address
-        });
-      },
-      (error) => {
-        console.warn('📍 Geolocation error:', error.message);
-        resolve(DEFAULT_LOCATION);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  });
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      timeoutMillis: 10000
+    });
+
+    const { latitude, longitude } = location.coords;
+    console.log(`📍 Got location: ${latitude}, ${longitude}`);
+
+    const address = await reverseGeocodeWithGoogleMaps(latitude, longitude);
+
+    return {
+      latitude,
+      longitude,
+      address
+    };
+  } catch (error) {
+    console.error('Error getting location:', error);
+    return DEFAULT_LOCATION;
+  }
 }
 
-export async function getLocationWithUserConsent(
-  onPermissionRequest?: () => Promise<boolean>
-): Promise<LocationData | null> {
+export async function getLocationWithUserConsent(): Promise<LocationData | null> {
   try {
     console.log('📍 Getting location with user consent');
+
+    // Try to request permission first
+    const granted = await requestLocationPermission();
+    if (!granted) {
+      console.warn('User denied location permission');
+      return DEFAULT_LOCATION;
+    }
+
     return await getCurrentLocation();
   } catch (error) {
-    console.error('Error getting location with user consent:', error);
+    console.error('Error getting location with consent:', error);
     return DEFAULT_LOCATION;
   }
 }
