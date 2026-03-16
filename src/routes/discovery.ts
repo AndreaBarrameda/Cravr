@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { mapsClient } from '../services/mapsClient';
-import { generateMatchReason, generateRestaurantMenu, GeneratedDish } from '../services/openaiClient';
+import { generateMatchReason, generateRestaurantMenu, GeneratedDish, generateRestaurantDescription, RestaurantDescription } from '../services/openaiClient';
 import { getFoodImage } from '../services/foodImageService';
 
 // Cache restaurants to avoid redundant Google Maps API calls
@@ -49,8 +49,15 @@ interface CachedMenu {
   timestamp: number;
 }
 
+interface CachedDescription {
+  description: RestaurantDescription;
+  timestamp: number;
+}
+
 const menuCache = new Map<string, CachedMenu>();
+const descriptionCache = new Map<string, CachedDescription>();
 const MENU_CACHE_TTL = 60 * 60 * 1000; // 60 minutes
+const DESCRIPTION_CACHE_TTL = 60 * 60 * 1000; // 60 minutes
 
 function getCachedMenu(id: string): GeneratedDish[] | null {
   const cached = menuCache.get(id);
@@ -75,6 +82,31 @@ function cacheMenu(id: string, dishes: GeneratedDish[]): void {
   });
   // eslint-disable-next-line no-console
   console.log(`[Menu Cache] Stored ${dishes.length} dishes for ${id}`);
+}
+
+function getCachedDescription(id: string): RestaurantDescription | null {
+  const cached = descriptionCache.get(id);
+
+  if (!cached) return null;
+
+  // Check if cache is expired
+  if (Date.now() - cached.timestamp > DESCRIPTION_CACHE_TTL) {
+    descriptionCache.delete(id);
+    return null;
+  }
+
+  // eslint-disable-next-line no-console
+  console.log(`[Description Cache] Hit for ${id}`);
+  return cached.description;
+}
+
+function cacheDescription(id: string, description: RestaurantDescription): void {
+  descriptionCache.set(id, {
+    description,
+    timestamp: Date.now()
+  });
+  // eslint-disable-next-line no-console
+  console.log(`[Description Cache] Stored description for ${id}`);
 }
 
 export const discoveryRouter = Router();
@@ -105,10 +137,18 @@ discoveryRouter.post('/restaurants', async (req, res) => {
 
     const restaurants = maps.results ?? [];
 
-    // Generate AI match reasons for each restaurant
+    // Generate AI match reasons and descriptions for each restaurant
     const results = await Promise.all(
       restaurants.map(async (r: any) => {
         const match_reason = await generateMatchReason(r.name, cuisine, r.rating || 4, r.price_level || 2);
+        const description = await generateRestaurantDescription(
+          r.name,
+          r.types ?? ['restaurant'],
+          r.price_level ?? 2,
+          '',
+          {},
+          r.rating || 4.0
+        );
 
         return {
           restaurant_id: `rst_${r.place_id}`,
@@ -122,7 +162,14 @@ discoveryRouter.post('/restaurants', async (req, res) => {
           match_reason,
           rating: r.rating,
           price_level: r.price_level,
-          vibe_tags: []
+          vibe_tags: [],
+          description: {
+            atmosphere: description.atmosphere,
+            why_match: description.why_match,
+            vibe: description.vibe,
+            best_for: description.best_for,
+            suggested_dishes: description.suggested_dishes
+          }
         };
       })
     );
@@ -320,6 +367,24 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
             cacheMenu(restaurantId, generatedDishes);
           }
 
+          // Check description cache first
+          let restaurantDescription = getCachedDescription(restaurantId);
+
+          if (!restaurantDescription) {
+            // Cache miss - generate description using OpenAI
+            // eslint-disable-next-line no-console
+            console.log(`[Description Cache] Miss for ${restaurantId} - generating description`);
+            restaurantDescription = await generateRestaurantDescription(
+              r.name,
+              r.types ?? ['restaurant'],
+              r.price_level ?? 2,
+              craving_text ?? '',
+              attributes ?? {},
+              r.rating || 4.0
+            );
+            cacheDescription(restaurantId, restaurantDescription);
+          }
+
           // Score dishes against user attributes
           const scoredDishes = generatedDishes.map((dish) => {
             let matchScore = 0;
@@ -373,7 +438,14 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                 restaurant_name: r.name,
                 rating: r.rating || 4.0,
                 match_score: dish.matchScore,
-                match_reason: `${dish.temperature === 'hot' ? '🔥' : '❄️'} ${dish.texture} ${dish.flavor} - ${dish.intensity} intensity`
+                match_reason: `${dish.temperature === 'hot' ? '🔥' : '❄️'} ${dish.texture} ${dish.flavor} - ${dish.intensity} intensity`,
+                restaurant_description: {
+                  atmosphere: restaurantDescription.atmosphere,
+                  why_match: restaurantDescription.why_match,
+                  vibe: restaurantDescription.vibe,
+                  best_for: restaurantDescription.best_for,
+                  suggested_dishes: restaurantDescription.suggested_dishes
+                }
               };
             })
           );

@@ -152,6 +152,107 @@ export interface GeneratedDish {
   intensity: string;    // "mild" | "medium" | "intense"
 }
 
+export interface RestaurantDescription {
+  atmosphere: string;           // "Cozy & intimate", "Lively & trendy", etc.
+  why_match: string;            // Why it fits the user's craving
+  suggested_dishes: string[];   // 3-5 specific dishes to order
+  vibe: string;                 // Quick vibe description
+  best_for: string;             // "Groups", "Dates", "Solo dining", etc.
+}
+
+export async function generateRestaurantDescription(
+  restaurantName: string,
+  cuisineTypes: string[],
+  priceLevel: number,
+  cravingText: string,
+  attributes: Record<string, string | null>,
+  rating: number
+): Promise<RestaurantDescription> {
+  if (!openai) {
+    // eslint-disable-next-line no-console
+    console.error('[OpenAI] Client is not initialized. Check OPENAI_API_KEY environment variable.');
+    // Return fallback description
+    return {
+      atmosphere: 'Welcoming and comfortable dining experience',
+      why_match: `A great spot for your ${cravingText || 'food'} craving`,
+      suggested_dishes: ['House Special', 'Chef\'s Recommendation', 'Customer Favorite'],
+      vibe: `Casual ${cuisineTypes[0] || 'dining'} restaurant`,
+      best_for: 'Everyone'
+    };
+  }
+
+  try {
+    const prompt = `You are a food critic and restaurant expert. Provide a detailed description of a restaurant.
+
+Restaurant: "${restaurantName}"
+Cuisine: ${cuisineTypes.join(', ')}
+Rating: ${rating}/5
+Price Level: ${priceLevel}/4
+User's Craving: "${cravingText || 'general food exploration'}"
+User Preferences: ${JSON.stringify(attributes)}
+
+Generate a response that includes:
+1. atmosphere: 1-2 sentence description of the restaurant's vibe and ambiance
+2. why_match: 1-2 sentences explaining why this restaurant is perfect for the user's craving/preferences
+3. vibe: 1 short sentence capturing the restaurant's essence
+4. best_for: Who would enjoy this restaurant most (e.g., "Groups", "Dates", "Business meetings", "Families")
+5. suggested_dishes: 3-5 specific, realistic dish names the user should definitely try at this restaurant
+
+Make it personal, specific, and convincing. Use the restaurant name and cuisine context to suggest authentic dishes.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'restaurant_description',
+          schema: {
+            type: 'object',
+            properties: {
+              atmosphere: { type: 'string' },
+              why_match: { type: 'string' },
+              vibe: { type: 'string' },
+              best_for: { type: 'string' },
+              suggested_dishes: {
+                type: 'array',
+                items: { type: 'string' },
+                minItems: 3,
+                maxItems: 5
+              }
+            },
+            required: ['atmosphere', 'why_match', 'vibe', 'best_for', 'suggested_dishes'],
+            additionalProperties: false
+          }
+        }
+      }
+    });
+
+    const choice = completion.choices[0];
+    if (choice.message.content) {
+      return JSON.parse(choice.message.content);
+    }
+
+    throw new Error('Unexpected response format from OpenAI');
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to generate AI restaurant description:', e);
+    // Return fallback description
+    return {
+      atmosphere: 'Welcoming and comfortable dining experience',
+      why_match: `A great spot for your ${cravingText || 'food'} craving`,
+      suggested_dishes: ['House Special', 'Chef\'s Recommendation', 'Customer Favorite'],
+      vibe: `Casual ${cuisineTypes[0] || 'dining'} restaurant`,
+      best_for: 'Everyone'
+    };
+  }
+}
+
 export async function generateRestaurantMenu(
   restaurantName: string,
   cuisineTypes: string[],
