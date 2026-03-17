@@ -39,7 +39,7 @@ type RestaurantData = {
 };
 
 export function RestaurantDetailScreen({ route, navigation }: Props) {
-  const { restaurantId, cravingId, cuisine } = route.params;
+  const { restaurantId, cravingId, cuisine, dishId } = route.params;
   const { state, setState } = useAppState();
   const [loading, setLoading] = useState(true);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -71,7 +71,15 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
 
         if (dishesData.results && Array.isArray(dishesData.results)) {
           setDishes(dishesData.results);
-          if (dishesData.results.length > 0) {
+          if (dishId) {
+            // Pre-select the specified dish if provided
+            const preSelected = dishesData.results.find((d: Dish) => d.dish_id === dishId);
+            if (preSelected) {
+              setSelectedDish(preSelected);
+            } else if (dishesData.results.length > 0) {
+              setSelectedDish(dishesData.results[0]);
+            }
+          } else if (dishesData.results.length > 0) {
             setSelectedDish(dishesData.results[0]);
           }
         }
@@ -84,7 +92,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     };
 
     fetchData();
-  }, [restaurantId, cravingId, state.location]);
+  }, [restaurantId, cravingId, state.location, dishId]);
 
   const onContinue = () => {
     if (selectedDish) {
@@ -174,7 +182,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                       <View style={styles.dishHeader}>
                         <Text style={styles.dishName}>{dish.name}</Text>
                         <Text style={styles.dishPrice}>
-                          ${dish.price.toFixed(2)}
+                          ₱{dish.price.toFixed(0)}
                         </Text>
                       </View>
                       <Text style={styles.dishDescription} numberOfLines={2}>

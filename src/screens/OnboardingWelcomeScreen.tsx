@@ -13,7 +13,7 @@ export function OnboardingWelcomeScreen({ navigation }: Props) {
       <View style={{ flex: 1 }} />
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('OnboardingPreferences')}
+        onPress={() => navigation.navigate('OnboardingProfile')}
       >
         <Text style={styles.buttonText}>Let's get started</Text>
       </TouchableOpacity>

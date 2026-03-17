@@ -43,7 +43,10 @@ export function SplashCravingScreen({ navigation }: Props) {
           suggested_cuisines: result.suggested_cuisines ?? []
         }
       }));
-      navigation.navigate('CuisineSelection', { cravingId: result.craving_id });
+      navigation.navigate('CuisineSelection', {
+        cravingId: result.craving_id,
+        cravingText: result.normalized || text.trim() // Pass actual craving text
+      });
     } catch (e) {
       // TODO: surface error to user
       // eslint-disable-next-line no-console

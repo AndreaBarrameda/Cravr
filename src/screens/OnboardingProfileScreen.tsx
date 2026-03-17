@@ -37,10 +37,10 @@ export function OnboardingProfileScreen({ navigation }: Props) {
     setState((prev) => ({
       ...prev,
       userProfile: { name: name.trim() },
-      location,
+      location: location || undefined,
       onboardingComplete: true
     }));
-    navigation.navigate('SplashCraving');
+    navigation.navigate('MainTabs');
   };
 
   return (

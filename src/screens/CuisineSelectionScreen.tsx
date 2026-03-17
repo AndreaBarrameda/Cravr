@@ -16,9 +16,10 @@ const FALLBACK_CUISINES = [
   { slug: 'american', name: 'American' }
 ];
 
-export function CuisineSelectionScreen({ navigation }: Props) {
+export function CuisineSelectionScreen({ navigation, route }: Props) {
   const { state, setState } = useAppState();
   const suggested = state.craving?.suggested_cuisines ?? [];
+  const cravingText = route.params?.cravingText || state.craving?.normalized || '';
 
   const cuisines =
     suggested.length > 0
@@ -29,6 +30,7 @@ export function CuisineSelectionScreen({ navigation }: Props) {
     setState((prev) => ({ ...prev, selectedCuisine: slug }));
     navigation.navigate('RestaurantDiscovery', {
       cravingId: state.craving!.craving_id,
+      cravingText: cravingText, // Pass craving text forward
       cuisine: slug
     });
   };

@@ -36,6 +36,7 @@ export const api = {
 
   discoverRestaurants(params: {
     craving_id: string;
+    craving_text?: string;
     cuisine: string;
     lat: number;
     lng: number;
@@ -44,6 +45,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({
         craving_id: params.craving_id,
+        craving_text: params.craving_text,
         cuisine: params.cuisine,
         location: { lat: params.lat, lng: params.lng },
         radius_meters: 3000
@@ -72,7 +74,7 @@ export const api = {
   },
 
   discoverDishesByAttributes(params: {
-    craving_id: string;
+    craving_text: string;
     cuisine: string;
     attributes: {
       temperature: string | null;
@@ -87,7 +89,7 @@ export const api = {
     return request('/discovery/dishes-by-attributes', {
       method: 'POST',
       body: JSON.stringify({
-        craving_id: params.craving_id,
+        craving_text: params.craving_text,
         cuisine: params.cuisine,
         attributes: params.attributes,
         location: params.location

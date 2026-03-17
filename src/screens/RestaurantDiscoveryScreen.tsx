@@ -28,7 +28,7 @@ type RestaurantCard = {
 };
 
 export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
-  const { cravingId, cuisine } = route.params;
+  const { cravingId, cravingText, cuisine } = route.params;
   const { state, setState } = useAppState();
   const [loading, setLoading] = useState(true);
   const [restaurants, setRestaurants] = useState<RestaurantCard[]>([]);
@@ -47,6 +47,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
 
         const data = await api.discoverRestaurants({
           craving_id: cravingId,
+          craving_text: cravingText,
           cuisine,
           lat,
           lng
@@ -74,7 +75,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   return (
     <ScreenContainer>
       <Text style={styles.title}>Matches near you</Text>
-      <Text style={styles.subtitle}>{cuisine} • based on your craving</Text>
+      <Text style={styles.subtitle}>{cravingText || cuisine || 'your search'} • based on your craving</Text>
 
       {loading ? (
         <View style={styles.loading}>

@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  SafeAreaView
+  SafeAreaView,
+  Animated,
+  PanResponder,
+  Dimensions
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
@@ -40,11 +42,37 @@ type Attributes = {
 };
 
 export function DishDiscoveryScreen({ route, navigation }: Props) {
-  const { cravingId, cuisine, attributes } = route.params;
+  const { cravingId, cuisine, attributes, craving_text } = route.params;
   const { state } = useAppState();
   const [loading, setLoading] = useState(true);
   const [dishes, setDishes] = useState<DishCard[]>([]);
   const [selectedDishIndex, setSelectedDishIndex] = useState(0);
+
+  const pan = useRef(new Animated.ValueXY()).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
+        useNativeDriver: false
+      }),
+      onPanResponderRelease: (e, { dx }) => {
+        const threshold = 50;
+        if (Math.abs(dx) > threshold) {
+          if (dx > 0) {
+            // Swipe right = select dish
+            handleSelectDish(dishes[selectedDishIndex]);
+          } else {
+            // Swipe left = pass
+            handleSwipeNext();
+          }
+          Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        } else {
+          Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+        }
+      }
+    })
+  ).current;
 
   useEffect(() => {
     const fetchDishes = async () => {
@@ -54,7 +82,7 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
 
         // Call API to discover dishes matching attributes
         const data = await api.discoverDishesByAttributes({
-          craving_id: cravingId,
+          craving_text: craving_text || cravingId || '',
           cuisine,
           attributes: attributes as Attributes,
           location: { lat, lng }
@@ -89,10 +117,12 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
     }
   };
 
-  const handleSwipePrevious = () => {
-    if (selectedDishIndex > 0) {
-      setSelectedDishIndex(selectedDishIndex - 1);
-    }
+  const handlePass = () => {
+    handleSwipeNext();
+  };
+
+  const handleLike = () => {
+    handleSelectDish(dishes[selectedDishIndex]);
   };
 
   if (loading) {
@@ -122,6 +152,25 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
 
   const currentDish = dishes[selectedDishIndex];
 
+  // Interpolate rotation based on swipe distance
+  const rotate = pan.x.interpolate({
+    inputRange: [-100, 0, 100],
+    outputRange: ['-15deg', '0deg', '15deg']
+  });
+
+  // Interpolate opacity for badge overlays
+  const rightOpacity = pan.x.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, 1],
+    extrapolate: 'clamp'
+  });
+
+  const leftOpacity = pan.x.interpolate({
+    inputRange: [-100, 0],
+    outputRange: [1, 0],
+    extrapolate: 'clamp'
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -131,8 +180,20 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
         </Text>
       </View>
 
-      {/* Main Dish Card */}
-      <View style={styles.cardContainer}>
+      {/* Swipeable Card */}
+      <Animated.View
+        style={[
+          styles.cardContainer,
+          {
+            transform: [
+              { translateX: pan.x },
+              { translateY: pan.y },
+              { rotate }
+            ]
+          }
+        ]}
+        {...panResponder.panHandlers}
+      >
         {currentDish.photo_url && (
           <Image
             source={{ uri: currentDish.photo_url }}
@@ -151,7 +212,7 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
             </View>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>💰 Price</Text>
-              <Text style={styles.statValue}>${currentDish.price.toFixed(0)}</Text>
+              <Text style={styles.statValue}>₱{currentDish.price.toFixed(0)}</Text>
             </View>
             <View style={styles.stat}>
               <Text style={styles.statLabel}>✨ Match</Text>
@@ -163,34 +224,28 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
             <Text style={styles.reasonText}>💡 {currentDish.match_reason}</Text>
           </View>
         </View>
-      </View>
 
-      {/* Navigation Controls */}
+        {/* Right swipe overlay (YUM!) */}
+        <Animated.View style={[styles.badgeOverlay, styles.badgeRight, { opacity: rightOpacity }]}>
+          <Text style={styles.badgeText}>YUM! 💚</Text>
+        </Animated.View>
+
+        {/* Left swipe overlay (PASS) */}
+        <Animated.View style={[styles.badgeOverlay, styles.badgeLeft, { opacity: leftOpacity }]}>
+          <Text style={styles.badgeText}>PASS ❌</Text>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Action Buttons */}
       <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.navButton, selectedDishIndex === 0 && styles.navButtonDisabled]}
-          onPress={handleSwipePrevious}
-          disabled={selectedDishIndex === 0}
-        >
-          <Text style={styles.navButtonText}>← Previous</Text>
+        <TouchableOpacity style={styles.actionButton} onPress={handlePass}>
+          <Text style={styles.actionButtonText}>PASS</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.navButton, selectedDishIndex === dishes.length - 1 && styles.navButtonDisabled]}
-          onPress={handleSwipeNext}
-          disabled={selectedDishIndex === dishes.length - 1}
-        >
-          <Text style={styles.navButtonText}>Next →</Text>
+        <TouchableOpacity style={[styles.actionButton, styles.actionButtonLike]} onPress={handleLike}>
+          <Text style={[styles.actionButtonText, styles.actionButtonTextLike]}>YUM!</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Select Button */}
-      <ScreenContainer>
-        <CravrButton
-          label={`Select & View "${currentDish.restaurant_name}"`}
-          onPress={() => handleSelectDish(currentDish)}
-        />
-      </ScreenContainer>
     </SafeAreaView>
   );
 }
@@ -303,23 +358,56 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 24,
     gap: 12
   },
-  navButton: {
+  actionButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: '#F0F0F0',
     borderRadius: 12,
-    alignItems: 'center'
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0'
   },
-  navButtonDisabled: {
-    opacity: 0.4
+  actionButtonLike: {
+    backgroundColor: '#FFE6D6',
+    borderColor: '#FF6A2A'
   },
-  navButtonText: {
+  actionButtonText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#161616'
+  },
+  actionButtonTextLike: {
+    color: '#FF6A2A'
+  },
+  badgeOverlay: {
+    position: 'absolute',
+    top: '50%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '40%',
+    height: '40%',
+    borderRadius: 12,
+    transform: [{ translateY: -50 }]
+  },
+  badgeRight: {
+    right: 20,
+    backgroundColor: '#D4F8D4',
+    borderWidth: 2,
+    borderColor: '#2ECC71'
+  },
+  badgeLeft: {
+    left: 20,
+    backgroundColor: '#FFD4D4',
+    borderWidth: 2,
+    borderColor: '#FF6B6B'
+  },
+  badgeText: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#161616'
   },
   emptyTitle: {
