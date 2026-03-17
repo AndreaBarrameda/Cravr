@@ -11,7 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
-import { requestLocationPermission, getLocationWithUserConsent } from '../services/locationService';
+import { getLocationWithUserConsent } from '../services/locationService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingProfile'>;
 
@@ -25,11 +25,7 @@ export function OnboardingProfileScreen({ navigation }: Props) {
     // eslint-disable-next-line no-console
     console.log('🎯 Starting location request in onboarding...');
 
-    // Request location permission before completing onboarding
-    const permissionGranted = await requestLocationPermission();
-    // eslint-disable-next-line no-console
-    console.log('📍 Permission granted:', permissionGranted);
-
+    // Request location and get location data (handles permission internally)
     const location = await getLocationWithUserConsent();
     // eslint-disable-next-line no-console
     console.log('📍 Location obtained in onboarding:', location);
