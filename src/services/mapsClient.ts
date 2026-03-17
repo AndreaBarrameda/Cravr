@@ -16,6 +16,31 @@ export const mapsClient = {
         key: env.mapsApiKey
       }
     });
+
+    // Fetch photos for each restaurant
+    if (res.data?.results) {
+      await Promise.all(
+        res.data.results.map(async (restaurant: any) => {
+          if (restaurant.place_id) {
+            try {
+              const detailsRes = await axios.get(url.replace('/nearbysearch/json', '/details/json'), {
+                params: {
+                  place_id: restaurant.place_id,
+                  key: env.mapsApiKey,
+                  fields: 'photos'
+                }
+              });
+              if (detailsRes.data?.result?.photos) {
+                restaurant.photos = detailsRes.data.result.photos;
+              }
+            } catch (e) {
+              // Silently fail if details fetch fails
+            }
+          }
+        })
+      );
+    }
+
     return res.data;
   },
 
