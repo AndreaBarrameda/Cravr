@@ -113,8 +113,9 @@ export const discoveryRouter = Router();
 
 discoveryRouter.post('/restaurants', async (req, res) => {
   try {
-    const { craving_id, cuisine, location, radius_meters = 3000 } = req.body as {
+    const { craving_id, craving_text, cuisine, location, radius_meters = 3000 } = req.body as {
       craving_id?: string;
+      craving_text?: string;
       cuisine?: string;
       location?: { lat?: number; lng?: number };
       radius_meters?: number;
@@ -126,7 +127,14 @@ discoveryRouter.post('/restaurants', async (req, res) => {
         .json({ error: 'location.lat and location.lng are required' });
     }
 
-    const keyword = cuisine ? `${cuisine} restaurant` : 'restaurant';
+    // Build search keyword from craving text and cuisine
+    // Prioritize craving text over cuisine if both are provided
+    let keyword = 'restaurant';
+    if (craving_text && craving_text.trim()) {
+      keyword = craving_text.trim();
+    } else if (cuisine && cuisine.trim()) {
+      keyword = `${cuisine} restaurant`;
+    }
 
     const maps = await mapsClient.nearbySearch({
       lat: location.lat,
@@ -337,16 +345,15 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
     // Shuffle restaurants to provide variety even with cached results
     // This ensures different requests return different restaurants/dishes
     const shuffled = [...restaurants].sort(() => Math.random() - 0.5);
-    // Select a random subset (between 15-25 restaurants) to ensure variety
-    const randomCount = Math.floor(Math.random() * 11) + 15; // 15-25 restaurants
-    const selectedRestaurants = shuffled.slice(0, Math.min(randomCount, shuffled.length));
+    // Select top 8 restaurants for faster menu generation
+    const selectedRestaurants = shuffled.slice(0, Math.min(8, shuffled.length));
 
     // eslint-disable-next-line no-console
-    console.log(`[Dishes] Selected ${selectedRestaurants.length} restaurants from ${restaurants.length} cached results. Processing up to 15 in parallel...`);
+    console.log(`[Dishes] Selected ${selectedRestaurants.length} restaurants from ${restaurants.length} cached results. Processing up to 8 in parallel...`);
 
-    // Process restaurants in parallel (limit to 15 at a time to avoid overwhelming the API)
+    // Process restaurants in parallel (limit to 8 at a time to avoid overwhelming the API)
     const allDishes: any[] = [];
-    const processLimit = Math.min(15, selectedRestaurants.length);
+    const processLimit = Math.min(8, selectedRestaurants.length);
 
     for (let i = 0; i < selectedRestaurants.length; i += processLimit) {
       const batch = selectedRestaurants.slice(i, i + processLimit);
