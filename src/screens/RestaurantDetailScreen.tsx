@@ -6,7 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
-  TouchableOpacity
+  TouchableOpacity,
+  Linking
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
@@ -15,15 +16,6 @@ import { useAppState } from '../state/AppStateContext';
 import { api } from '../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
-
-type Dish = {
-  dish_id: string;
-  name: string;
-  description: string;
-  photo_url: string | null;
-  price: number;
-  match_score: number;
-};
 
 type RestaurantData = {
   restaurant_id: string;
@@ -36,52 +28,25 @@ type RestaurantData = {
   hours: string;
   distance_meters: number;
   vibe_tags: string[];
+  website?: string;
 };
 
 export function RestaurantDetailScreen({ route, navigation }: Props) {
-  const { restaurantId, cravingId, cuisine, dishId } = route.params;
-  const { state, setState } = useAppState();
+  const { restaurantId, cravingId, cuisine } = route.params;
+  const { state } = useAppState();
   const [loading, setLoading] = useState(true);
-  const [dishes, setDishes] = useState<Dish[]>([]);
-  const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const lat = state.location?.latitude ?? 34.0522;
-        const lng = state.location?.longitude ?? -118.2437;
-
         // Extract place_id from restaurant_id (format: rst_<place_id>)
         const placeId = restaurantId.replace(/^rst_/, '');
 
-        // Fetch restaurant details
+        // Fetch restaurant details from Google Maps
         const detailsData = await api.getRestaurantDetails(placeId);
         if (detailsData) {
           setRestaurantData(detailsData);
-        }
-
-        // Fetch dishes
-        const dishesData = await api.discoverDishes({
-          restaurant_id: restaurantId,
-          craving_id: cravingId,
-          lat,
-          lng
-        });
-
-        if (dishesData.results && Array.isArray(dishesData.results)) {
-          setDishes(dishesData.results);
-          if (dishId) {
-            // Pre-select the specified dish if provided
-            const preSelected = dishesData.results.find((d: Dish) => d.dish_id === dishId);
-            if (preSelected) {
-              setSelectedDish(preSelected);
-            } else if (dishesData.results.length > 0) {
-              setSelectedDish(dishesData.results[0]);
-            }
-          } else if (dishesData.results.length > 0) {
-            setSelectedDish(dishesData.results[0]);
-          }
         }
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -92,19 +57,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     };
 
     fetchData();
-  }, [restaurantId, cravingId, state.location, dishId]);
-
-  const onContinue = () => {
-    if (selectedDish) {
-      setState((prev) => ({ ...prev, selectedDishId: selectedDish.dish_id }));
-      navigation.navigate('SoloCheck', {
-        restaurantId,
-        dishId: selectedDish.dish_id,
-        cravingId,
-        cuisine
-      });
-    }
-  };
+  }, [restaurantId]);
 
   if (loading) {
     return (
@@ -158,58 +111,76 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
               )}
             </View>
 
-            {/* Menu Items */}
+            {/* Real Menu Links */}
             <View style={styles.menuSection}>
-              <Text style={styles.sectionTitle}>Recommended Dishes</Text>
+              <Text style={styles.sectionTitle}>View Real Menu</Text>
+              <Text style={styles.menuSubtitle}>Check out the actual menu and prices</Text>
 
-              {dishes.length > 0 ? (
-                dishes.map((dish) => (
-                  <TouchableOpacity
-                    key={dish.dish_id}
-                    style={[
-                      styles.dishCard,
-                      selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
-                    ]}
-                    onPress={() => setSelectedDish(dish)}
-                  >
-                    {dish.photo_url && (
-                      <Image
-                        source={{ uri: dish.photo_url }}
-                        style={styles.dishImage}
-                      />
-                    )}
-                    <View style={styles.dishInfo}>
-                      <View style={styles.dishHeader}>
-                        <Text style={styles.dishName}>{dish.name}</Text>
-                        <Text style={styles.dishPrice}>
-                          ₱{dish.price.toFixed(0)}
-                        </Text>
-                      </View>
-                      <Text style={styles.dishDescription} numberOfLines={2}>
-                        {dish.description}
-                      </Text>
-                      <View style={styles.matchScore}>
-                        <Text style={styles.matchScoreText}>
-                          ✨ {Math.round(dish.match_score * 100)}% match
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>
-                    No recommended dishes available
-                  </Text>
-                </View>
+              {restaurantData.website && (
+                <TouchableOpacity
+                  style={styles.menuLink}
+                  onPress={() => Linking.openURL(restaurantData.website!)}
+                >
+                  <Text style={styles.menuLinkIcon}>🌐</Text>
+                  <View style={styles.menuLinkContent}>
+                    <Text style={styles.menuLinkTitle}>Restaurant Website</Text>
+                    <Text style={styles.menuLinkDesc}>View full menu & details</Text>
+                  </View>
+                  <Text style={styles.menuLinkArrow}>→</Text>
+                </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.menuLink}
+                onPress={() => {
+                  const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(restaurantData.name)}`;
+                  Linking.openURL(searchUrl);
+                }}
+              >
+                <Text style={styles.menuLinkIcon}>📍</Text>
+                <View style={styles.menuLinkContent}>
+                  <Text style={styles.menuLinkTitle}>Google Maps</Text>
+                  <Text style={styles.menuLinkDesc}>See menu, reviews & hours</Text>
+                </View>
+                <Text style={styles.menuLinkArrow}>→</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuLink}
+                onPress={() => {
+                  const searchUrl = `https://www.grabfood.com/ph/search?q=${encodeURIComponent(restaurantData.name)}`;
+                  Linking.openURL(searchUrl);
+                }}
+              >
+                <Text style={styles.menuLinkIcon}>🍽️</Text>
+                <View style={styles.menuLinkContent}>
+                  <Text style={styles.menuLinkTitle}>GrabFood</Text>
+                  <Text style={styles.menuLinkDesc}>Real menu with prices</Text>
+                </View>
+                <Text style={styles.menuLinkArrow}>→</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuLink}
+                onPress={() => {
+                  const searchUrl = `https://www.foodpanda.ph/search?q=${encodeURIComponent(restaurantData.name)}`;
+                  Linking.openURL(searchUrl);
+                }}
+              >
+                <Text style={styles.menuLinkIcon}>🎯</Text>
+                <View style={styles.menuLinkContent}>
+                  <Text style={styles.menuLinkTitle}>Foodpanda</Text>
+                  <Text style={styles.menuLinkDesc}>Check available items</Text>
+                </View>
+                <Text style={styles.menuLinkArrow}>→</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Continue Button */}
             <View style={styles.footer}>
               <CravrButton
-                label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
-                onPress={onContinue}
+                label="Back to Restaurants"
+                onPress={() => navigation.goBack()}
               />
             </View>
           </>
@@ -387,6 +358,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B6B6B',
     textAlign: 'center'
+  },
+  menuSubtitle: {
+    fontSize: 13,
+    color: '#6B6B6B',
+    marginBottom: 16
+  },
+  menuLink: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2
+  },
+  menuLinkIcon: {
+    fontSize: 28,
+    marginRight: 12
+  },
+  menuLinkContent: {
+    flex: 1
+  },
+  menuLinkTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#161616',
+    marginBottom: 4
+  },
+  menuLinkDesc: {
+    fontSize: 13,
+    color: '#6B6B6B'
+  },
+  menuLinkArrow: {
+    fontSize: 16,
+    color: '#FF6A2A',
+    fontWeight: '600'
   },
   footer: {
     marginTop: 20,
