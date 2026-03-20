@@ -30,6 +30,8 @@ type TrendingRestaurant = {
   rating: number;
   price_level: number;
   michelin_stars?: number;
+  michelin_designation?: 'plate' | 'bibGourmand' | '1-star' | '2-star' | '3-star';
+  michelin_label?: string;
   distance_meters?: number;
   vibe_tags?: string[];
 };
@@ -37,20 +39,38 @@ type TrendingRestaurant = {
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
 
-const getMichelinStars = (stars?: number) => {
-  if (!stars) return null;
-  if (stars >= 3) return '★★★';
-  if (stars === 2) return '★★';
-  if (stars === 1) return '★';
-  return null;
-};
+const getMichelinBadge = (designation?: string, label?: string) => {
+  if (!designation) return null;
 
-const getMichelinColor = (stars?: number) => {
-  if (!stars) return '#999';
-  if (stars >= 3) return '#FFD700';
-  if (stars === 2) return '#FFA500';
-  if (stars === 1) return '#FF6A2A';
-  return '#999';
+  let icon = '';
+  let color = '#999';
+
+  switch (designation) {
+    case 'bibGourmand':
+      icon = '🤤 Bib Gourmand';
+      color = '#FF6A2A';
+      break;
+    case 'plate':
+      icon = '🍽️ Michelin Selection';
+      color = '#6B6B6B';
+      break;
+    case '1-star':
+      icon = '⭐ Michelin ★';
+      color = '#FF6A2A';
+      break;
+    case '2-star':
+      icon = '⭐⭐ Michelin ★★';
+      color = '#FFA500';
+      break;
+    case '3-star':
+      icon = '⭐⭐⭐ Michelin ★★★';
+      color = '#FFD700';
+      break;
+    default:
+      return null;
+  }
+
+  return { icon, color };
 };
 
 export function TrendingScreen({ navigation }: Props) {
@@ -99,7 +119,7 @@ export function TrendingScreen({ navigation }: Props) {
   }, [state.location]);
 
   // Organize restaurants by category
-  const michelinRestaurants = allRestaurants.filter((r) => (r.michelin_stars || 0) > 0);
+  const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
   const topRatedRestaurants = [...allRestaurants]
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 5);
@@ -129,15 +149,15 @@ export function TrendingScreen({ navigation }: Props) {
           <Text style={styles.carouselMeta}>
             {item.rating.toFixed(1)} ★ • {'$'.repeat(item.price_level || 1)}
           </Text>
-          {item.michelin_stars ? (
+          {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
             <View
               style={[
                 styles.carouselMichelinBadge,
-                { backgroundColor: getMichelinColor(item.michelin_stars) }
+                { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
               ]}
             >
               <Text style={styles.carouselMichelinText}>
-                🌟 Michelin {getMichelinStars(item.michelin_stars)}
+                {getMichelinBadge(item.michelin_designation)?.icon}
               </Text>
             </View>
           ) : null}
@@ -172,15 +192,15 @@ export function TrendingScreen({ navigation }: Props) {
             )}
           </Text>
         </View>
-        {item.michelin_stars ? (
+        {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
           <View
             style={[
               styles.smallMichelinBadge,
-              { backgroundColor: getMichelinColor(item.michelin_stars) }
+              { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
             ]}
           >
             <Text style={styles.smallMichelinText}>
-              {getMichelinStars(item.michelin_stars)}
+              {getMichelinBadge(item.michelin_designation)?.icon}
             </Text>
           </View>
         ) : null}
@@ -243,10 +263,10 @@ export function TrendingScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Michelin Stars Section */}
+        {/* Michelin Guide Section */}
         {michelinRestaurants.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🌟 Michelin Starred</Text>
+            <Text style={styles.sectionTitle}>🏆 Michelin Guide</Text>
             {michelinRestaurants.slice(0, 5).map((restaurant) => (
               <View key={restaurant.restaurant_id}>
                 {renderSmallCard({ item: restaurant })}
