@@ -14,14 +14,14 @@ import {
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { RootStackParamList, TabParamList } from '../../App';
+import { RootStackParamList, TabParamList, DiscoverStackParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Discover'>,
-  NativeStackScreenProps<RootStackParamList>
+  NativeStackScreenProps<DiscoverStackParamList>
 >;
 
 type Attributes = {
