@@ -218,24 +218,25 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.background
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
     color: tokens.colors.textPrimary,
     marginBottom: tokens.spacing.xs
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: tokens.colors.textTertiary
+    fontSize: 13,
+    color: tokens.colors.textSecondary,
+    fontWeight: '500'
   },
   listContent: {
-    paddingHorizontal: tokens.spacing.md
+    paddingHorizontal: 0
   },
   card: {
     height: CARD_HEIGHT,
-    borderRadius: tokens.radius.xl,
+    borderRadius: 0,
     overflow: 'hidden',
-    marginHorizontal: tokens.spacing.sm,
-    backgroundColor: tokens.colors.textSecondary
+    marginHorizontal: 0,
+    backgroundColor: tokens.colors.background
   },
   image: {
     width: '100%',
@@ -259,13 +260,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.xl
+    padding: tokens.spacing.xl,
+    paddingBottom: 120
   },
   badgeRow: {
     flexDirection: 'row',
     gap: tokens.spacing.sm,
-    marginBottom: tokens.spacing.md
+    marginBottom: tokens.spacing.lg,
+    flexWrap: 'wrap'
   },
   hotBadge: {
     backgroundColor: '#FF4444',
@@ -287,58 +289,66 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700'
   },
   name: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: tokens.spacing.sm
+    marginBottom: tokens.spacing.lg,
+    lineHeight: 34
   },
   metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: tokens.spacing.md
+    flexDirection: 'column',
+    marginBottom: tokens.spacing.lg,
+    gap: tokens.spacing.sm
   },
   meta: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600'
   },
   reviews: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    fontWeight: '500'
   },
   engagementBar: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    marginBottom: tokens.spacing.sm,
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 3,
+    marginBottom: tokens.spacing.md,
     overflow: 'hidden'
   },
   engagementFill: {
     height: '100%',
     backgroundColor: tokens.colors.primary,
-    borderRadius: 2
+    borderRadius: 3
   },
   engagementLabel: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    marginBottom: tokens.spacing.md
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: tokens.spacing.lg
   },
   cta: {
     backgroundColor: tokens.colors.primary,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radius.md,
+    paddingVertical: tokens.spacing.lg,
+    borderRadius: tokens.radius.lg,
     alignItems: 'center',
-    marginTop: tokens.spacing.md
+    marginTop: tokens.spacing.xl,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5
   },
   ctaText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 16
+    fontSize: 17,
+    letterSpacing: 0.5
   },
   dotsContainer: {
     flexDirection: 'row',
