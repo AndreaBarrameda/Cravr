@@ -73,9 +73,15 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   };
 
   return (
-    <ScreenContainer>
-      <Text style={styles.title}>Matches near you</Text>
-      <Text style={styles.subtitle}>{cravingText || cuisine || 'your search'} • based on your craving</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
+      <ScreenContainer>
+        <Text style={styles.title}>Matches near you</Text>
+        <Text style={styles.subtitle}>{cravingText || cuisine || 'your search'} • based on your craving</Text>
 
       {loading ? (
         <View style={styles.loading}>
@@ -120,11 +126,30 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </ScreenContainer>
+      </ScreenContainer>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF8F3'
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8
+  },
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF6A2A'
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',

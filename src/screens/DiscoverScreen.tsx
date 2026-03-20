@@ -79,6 +79,15 @@ export function DiscoverScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const { state, setState } = useAppState();
 
+  // Auto-navigate if there's an active craving (from HomeScreen)
+  React.useEffect(() => {
+    if (state.craving?.craving_id) {
+      navigation.navigate('CuisineSelection', {
+        cravingId: state.craving.craving_id
+      });
+    }
+  }, [state.craving?.craving_id]);
+
   const moodTags = [
     'Spicy',
     'Salty',

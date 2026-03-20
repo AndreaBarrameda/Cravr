@@ -46,7 +46,9 @@ export function HomeScreen({ navigation }: Props) {
           suggested_cuisines: result.suggested_cuisines ?? []
         }
       }));
-      navigation.navigate('CuisineSelection', { cravingId: result.craving_id });
+      // Navigate to Discover tab (which contains the discover stack)
+      // The DiscoverScreen will handle navigation from there
+      navigation.navigate('Discover' as any);
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(e);
