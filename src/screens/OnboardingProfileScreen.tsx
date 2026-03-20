@@ -14,6 +14,7 @@ import { RootStackParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { getLocationWithUserConsent } from '../services/locationService';
+import { saveUserPreferences } from '../services/firebaseClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingProfile'>;
 
@@ -36,7 +37,7 @@ export function OnboardingProfileScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState<string | null>(null);
   const [favoriteFood, setFavoriteFood] = useState('');
-  const { setState } = useAppState();
+  const { state, setState } = useAppState();
 
   const handleDone = async () => {
     if (!name.trim() || !selectedCuisine || !favoriteFood.trim()) return;
@@ -52,6 +53,21 @@ export function OnboardingProfileScreen({ navigation }: Props) {
       onboardingComplete: true
     }));
     navigation.navigate('MainTabs');
+
+    // Save preferences to Firebase in background (non-blocking)
+    if (state.authUser?.id) {
+      saveUserPreferences(state.authUser.id, {
+        favoriteCuisine: selectedCuisine,
+        favoriteFood: favoriteFood.trim()
+      })
+        .then(() => {
+          // eslint-disable-next-line no-console
+          console.log('✅ Preferences saved to Firebase');
+        })
+        .catch(() => {
+          // Silently fail - preferences can still be used locally
+        });
+    }
 
     // Request location in background (non-blocking)
     getLocationWithUserConsent()

@@ -52,6 +52,10 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
           lat,
           lng
         });
+        // eslint-disable-next-line no-console
+        console.log('🍽️ API Response:', data);
+        // eslint-disable-next-line no-console
+        console.log('🍽️ First restaurant:', data.results?.[0]);
         setRestaurants(data.results);
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -106,7 +110,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardMeta}>
                   {item.rating ? `${item.rating.toFixed(1)} ★` : 'New'} •{' '}
-                  {'$'.repeat(item.price_level || 1)}
+                  {'$'.repeat(item.price_level || 1)} • {item.distance_meters ? (item.distance_meters > 1000 ? `${(item.distance_meters / 1000).toFixed(1)}km` : `${item.distance_meters}m`) : '—'}
                 </Text>
                 {item.match_reason && (
                   <Text style={styles.cardReason}>{item.match_reason}</Text>

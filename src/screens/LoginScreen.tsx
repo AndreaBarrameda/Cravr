@@ -13,7 +13,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { CravrButton } from '../components/UI';
-import { signIn } from '../services/firebaseClient';
+import { signIn, loadUserPreferences } from '../services/firebaseClient';
 import { useAppState } from '../state/AppStateContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
@@ -40,13 +40,20 @@ export function LoginScreen({ navigation }: Props) {
     }
 
     if (user) {
+      // Load saved preferences from Firebase
+      const { preferences } = await loadUserPreferences(user.id);
+
       setState((prev) => ({
         ...prev,
         isAuthenticated: true,
         authUser: user,
         userProfile: {
-          name: user.name || user.email
-        }
+          name: user.name || user.email,
+          favoriteCuisine: preferences?.favoriteCuisine,
+          favoriteFood: preferences?.favoriteFood
+        },
+        // Skip onboarding if user has saved preferences
+        onboardingComplete: !!preferences?.favoriteCuisine
       }));
     }
   };
