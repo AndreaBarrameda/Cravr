@@ -42,6 +42,13 @@ export function OnboardingProfileScreen({ navigation }: Props) {
   const handleDone = async () => {
     if (!name.trim() || !selectedCuisine || !favoriteFood.trim()) return;
 
+    const userId = state.authUser?.id;
+    if (!userId) {
+      // eslint-disable-next-line no-console
+      console.error('❌ No user ID available - cannot save preferences');
+      return;
+    }
+
     // Update state immediately and navigate - don't block on location
     setState((prev) => ({
       ...prev,
@@ -55,19 +62,23 @@ export function OnboardingProfileScreen({ navigation }: Props) {
     navigation.navigate('MainTabs');
 
     // Save preferences to Firebase in background (non-blocking)
-    if (state.authUser?.id) {
-      saveUserPreferences(state.authUser.id, {
-        favoriteCuisine: selectedCuisine,
-        favoriteFood: favoriteFood.trim()
-      })
-        .then(() => {
+    saveUserPreferences(userId, {
+      favoriteCuisine: selectedCuisine,
+      favoriteFood: favoriteFood.trim()
+    })
+      .then(({ error }) => {
+        if (error) {
           // eslint-disable-next-line no-console
-          console.log('✅ Preferences saved to Firebase');
-        })
-        .catch(() => {
-          // Silently fail - preferences can still be used locally
-        });
-    }
+          console.error('❌ Failed to save preferences:', error);
+        } else {
+          // eslint-disable-next-line no-console
+          console.log('✅ Preferences saved to Firebase for user:', userId);
+        }
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('❌ Exception while saving preferences:', err);
+      });
 
     // Request location in background (non-blocking)
     getLocationWithUserConsent()

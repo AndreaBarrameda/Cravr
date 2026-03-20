@@ -52,10 +52,19 @@ export function LoginScreen({ navigation }: Props) {
 
       // Load preferences in background (non-blocking)
       loadUserPreferences(user.id)
-        .then(({ preferences }) => {
+        .then(({ preferences, error }) => {
+          if (error) {
+            // eslint-disable-next-line no-console
+            console.error('❌ Error loading preferences:', error);
+            return;
+          }
+
           // eslint-disable-next-line no-console
-          console.log('✅ Loaded preferences:', preferences);
+          console.log('📋 Preferences loaded:', preferences);
+
           if (preferences?.favoriteCuisine) {
+            // eslint-disable-next-line no-console
+            console.log('✅ User has saved preferences, skipping onboarding');
             setState((prev) => ({
               ...prev,
               userProfile: {
@@ -65,11 +74,14 @@ export function LoginScreen({ navigation }: Props) {
               },
               onboardingComplete: true
             }));
+          } else {
+            // eslint-disable-next-line no-console
+            console.log('⚠️ No saved preferences found, user will see onboarding');
           }
         })
         .catch((err) => {
           // eslint-disable-next-line no-console
-          console.error('Failed to load preferences:', err);
+          console.error('❌ Exception loading preferences:', err);
           // Continue without preferences - user will do onboarding
         });
     }
