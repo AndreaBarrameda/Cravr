@@ -67,21 +67,29 @@ export function TrendingScreen({ navigation }: Props) {
           ? { lat: state.location.latitude, lng: state.location.longitude }
           : { lat: 10.3157, lng: 123.8854 };
 
-        const data = await api.discoverRestaurants({
-          craving_id: 'trending',
-          craving_text: 'trending restaurants',
-          cuisine: '',
-          lat: location.lat,
-          lng: location.lng
-        });
+        // Create a timeout promise (5 seconds)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), 5000)
+        );
+
+        const data = await Promise.race([
+          api.getTrendingRestaurants({
+            lat: location.lat,
+            lng: location.lng,
+            limit: 15
+          }),
+          timeoutPromise
+        ]);
 
         // eslint-disable-next-line no-console
-        console.log('🔥 Trending data:', data);
+        console.log('🔥 Trending data loaded:', data.results?.length, 'restaurants');
 
         setAllRestaurants(data.results?.slice(0, 15) || []);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to fetch trending:', e);
+        // Show empty state instead of error
+        setAllRestaurants([]);
       } finally {
         setLoading(false);
       }
