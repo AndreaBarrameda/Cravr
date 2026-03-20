@@ -11,13 +11,20 @@ import {
   ScrollView,
   Dimensions
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, TabParamList, TrendingStackParamList } from '../../App';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { useTheme } from '../theme/useTheme';
+import { PostCard } from '../components/PostCard';
+import { ReviewCard } from '../components/ReviewCard';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collectionGroup, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { tokens } from '../theme/tokens';
+import type { FoodPost, FoodReview } from '../services/firebaseClient';
 
 type Props = NativeStackScreenProps<TrendingStackParamList, 'TrendingHome'>;
 
@@ -80,11 +87,15 @@ const getMichelinBadge = (designation?: string, label?: string) => {
 
 export function TrendingScreen({ navigation }: Props) {
   const { state } = useAppState();
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [allRestaurants, setAllRestaurants] = useState<TrendingRestaurant[]>([]);
   const [michelinGuide, setMichelinGuide] = useState<{ bib_gourmand: MichelinRestaurant[]; michelin_selection: MichelinRestaurant[] }>({ bib_gourmand: [], michelin_selection: [] });
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [liveFeed, setLiveFeed] = useState<(FoodPost | FoodReview)[]>([]);
+  const [loadingFeed, setLoadingFeed] = useState(false);
 
+  // Load trending restaurants and data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -129,6 +140,59 @@ export function TrendingScreen({ navigation }: Props) {
 
     fetchData();
   }, [state.location]);
+
+  // Load live feed (posts and reviews from all users)
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadLiveFeed = async () => {
+        try {
+          setLoadingFeed(true);
+          const db = getFirestore();
+
+          // Query all posts from all users
+          const postsQuery = query(
+            collectionGroup(db, 'posts'),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+          );
+          const postsSnapshot = await getDocs(postsQuery);
+          const posts = postsSnapshot.docs.map((doc) => ({
+            ...doc.data(),
+            id: doc.id
+          })) as (FoodPost & { id: string })[];
+
+          // Query all reviews from all users
+          const reviewsQuery = query(
+            collectionGroup(db, 'reviews'),
+            orderBy('createdAt', 'desc'),
+            limit(20)
+          );
+          const reviewsSnapshot = await getDocs(reviewsQuery);
+          const reviews = reviewsSnapshot.docs.map((doc) => ({
+            ...doc.data(),
+            id: doc.id
+          })) as (FoodReview & { id: string })[];
+
+          // Merge and sort by timestamp
+          const combined = [...posts, ...reviews].sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() || 0;
+            const bTime = b.createdAt?.toMillis?.() || 0;
+            return bTime - aTime;
+          });
+
+          setLiveFeed(combined.slice(0, 30));
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load live feed:', e);
+          setLiveFeed([]);
+        } finally {
+          setLoadingFeed(false);
+        }
+      };
+
+      loadLiveFeed();
+    }, [])
+  );
 
   // Organize restaurants by category
   const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
@@ -241,12 +305,6 @@ export function TrendingScreen({ navigation }: Props) {
               <Text style={styles.title}>🔥 What's Trending</Text>
               <Text style={styles.subtitle}>In Cebu right now</Text>
             </View>
-            <TouchableOpacity
-              style={styles.feedButton}
-              onPress={() => navigation.navigate('TrendingFeed')}
-            >
-              <Text style={styles.feedButtonText}>Live Feed →</Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -358,14 +416,52 @@ export function TrendingScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* All Trending Section */}
+        {/* Live Feed Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>TRENDING THIS WEEK</Text>
-          {trendingRestaurants.slice(0, 8).map((restaurant) => (
-            <View key={restaurant.restaurant_id}>
-              {renderSmallCard({ item: restaurant })}
+          <Text style={styles.sectionTitle}>LIVE FEED</Text>
+          {loadingFeed ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={tokens.colors.primary} size="small" />
             </View>
-          ))}
+          ) : liveFeed.length === 0 ? (
+            <View style={styles.emptyFeedContainer}>
+              <Text style={[styles.emptyFeedEmoji]}>🍽️</Text>
+              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>No posts yet</Text>
+              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
+                Be the first to share your food experience!
+              </Text>
+            </View>
+          ) : (
+            liveFeed.map((item) => {
+              if ('emoji' in item && 'text' in item) {
+                // It's a post
+                const post = item as FoodPost & { id: string };
+                return (
+                  <View key={post.id} style={styles.feedItem}>
+                    <PostCard
+                      emoji={post.emoji}
+                      text={post.text}
+                      restaurantName={post.restaurantName}
+                      createdAt={post.createdAt}
+                    />
+                  </View>
+                );
+              } else {
+                // It's a review
+                const review = item as FoodReview & { id: string };
+                return (
+                  <View key={review.id} style={styles.feedItem}>
+                    <ReviewCard
+                      restaurantName={review.restaurantName}
+                      rating={review.rating}
+                      text={review.text}
+                      createdAt={review.createdAt}
+                    />
+                  </View>
+                );
+              }
+            })
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -406,19 +502,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: tokens.colors.textSecondary
-  },
-  feedButton: {
-    backgroundColor: tokens.colors.primary,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.md,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  feedButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: tokens.colors.textInverse
   },
   carouselSection: {
     marginBottom: tokens.spacing.xxxl
@@ -575,5 +658,25 @@ const styles = StyleSheet.create({
   },
   michelinBadgeText: {
     fontSize: 20
+  },
+  feedItem: {
+    marginBottom: tokens.spacing.md
+  },
+  emptyFeedContainer: {
+    alignItems: 'center',
+    paddingVertical: tokens.spacing.xxxl
+  },
+  emptyFeedEmoji: {
+    fontSize: 48,
+    marginBottom: tokens.spacing.lg
+  },
+  emptyFeedText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: tokens.spacing.sm
+  },
+  emptyFeedSubtext: {
+    fontSize: 14,
+    textAlign: 'center'
   }
 });
