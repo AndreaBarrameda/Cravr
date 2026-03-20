@@ -41,14 +41,7 @@ export function OnboardingProfileScreen({ navigation }: Props) {
   const handleDone = async () => {
     if (!name.trim() || !selectedCuisine || !favoriteFood.trim()) return;
 
-    // eslint-disable-next-line no-console
-    console.log('🎯 Starting location request in onboarding...');
-
-    // Request location and get location data (handles permission internally)
-    const location = await getLocationWithUserConsent();
-    // eslint-disable-next-line no-console
-    console.log('📍 Location obtained in onboarding:', location);
-
+    // Update state immediately and navigate - don't block on location
     setState((prev) => ({
       ...prev,
       userProfile: {
@@ -56,10 +49,22 @@ export function OnboardingProfileScreen({ navigation }: Props) {
         favoriteCuisine: selectedCuisine,
         favoriteFood: favoriteFood.trim()
       },
-      location: location || undefined,
       onboardingComplete: true
     }));
     navigation.navigate('MainTabs');
+
+    // Request location in background (non-blocking)
+    getLocationWithUserConsent()
+      .then((location) => {
+        // eslint-disable-next-line no-console
+        console.log('📍 Location obtained in background:', location);
+        if (location) {
+          setState((prev) => ({ ...prev, location }));
+        }
+      })
+      .catch(() => {
+        // Silently fail - location is optional
+      });
   };
 
   const isComplete = name.trim() && selectedCuisine && favoriteFood.trim();
