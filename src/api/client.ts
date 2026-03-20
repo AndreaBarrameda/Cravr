@@ -53,6 +53,20 @@ export const api = {
     });
   },
 
+  getTrendingRestaurants(params: {
+    lat: number;
+    lng: number;
+    limit?: number;
+  }) {
+    return request('/discovery/trending', {
+      method: 'POST',
+      body: JSON.stringify({
+        location: { lat: params.lat, lng: params.lng },
+        limit: params.limit || 10
+      })
+    });
+  },
+
   discoverDishes(params: {
     restaurant_id: string;
     craving_id: string;

@@ -23,11 +23,13 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { DishDiscoveryScreen } from './src/screens/DishDiscoveryScreen';
+import { TrendingScreen } from './src/screens/TrendingScreen';
 import { AppStateProvider, useAppState } from './src/state/AppStateContext';
 
 export type TabParamList = {
   Home: undefined;
   Discover: undefined;
+  Trending: undefined;
   Profile: undefined;
 };
 
@@ -163,6 +165,14 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Discover',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🔍</Text>
+        }}
+      />
+      <Tab.Screen
+        name="Trending"
+        component={TrendingScreen}
+        options={{
+          tabBarLabel: 'Trending',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🔥</Text>
         }}
       />
       <Tab.Screen

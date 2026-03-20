@@ -40,21 +40,38 @@ export function LoginScreen({ navigation }: Props) {
     }
 
     if (user) {
-      // Load saved preferences from Firebase
-      const { preferences } = await loadUserPreferences(user.id);
-
+      // Set authenticated state immediately
       setState((prev) => ({
         ...prev,
         isAuthenticated: true,
         authUser: user,
         userProfile: {
-          name: user.name || user.email,
-          favoriteCuisine: preferences?.favoriteCuisine,
-          favoriteFood: preferences?.favoriteFood
-        },
-        // Skip onboarding if user has saved preferences
-        onboardingComplete: !!preferences?.favoriteCuisine
+          name: user.name || user.email
+        }
       }));
+
+      // Load preferences in background (non-blocking)
+      loadUserPreferences(user.id)
+        .then(({ preferences }) => {
+          // eslint-disable-next-line no-console
+          console.log('✅ Loaded preferences:', preferences);
+          if (preferences?.favoriteCuisine) {
+            setState((prev) => ({
+              ...prev,
+              userProfile: {
+                ...prev.userProfile,
+                favoriteCuisine: preferences.favoriteCuisine,
+                favoriteFood: preferences.favoriteFood
+              },
+              onboardingComplete: true
+            }));
+          }
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load preferences:', err);
+          // Continue without preferences - user will do onboarding
+        });
     }
   };
 
