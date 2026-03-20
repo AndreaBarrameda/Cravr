@@ -149,29 +149,73 @@ export function TrendingScreen({ navigation }: Props) {
           setLoadingFeed(true);
           const db = getFirestore();
 
-          // Query all posts from all users
-          const postsQuery = query(
-            collectionGroup(db, 'posts'),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-          );
-          const postsSnapshot = await getDocs(postsQuery);
-          const posts = postsSnapshot.docs.map((doc) => ({
-            ...doc.data(),
-            id: doc.id
-          })) as (FoodPost & { id: string })[];
+          // Query all posts from all users using collectionGroup
+          let posts: (FoodPost & { id: string })[] = [];
+          let reviews: (FoodReview & { id: string })[] = [];
 
-          // Query all reviews from all users
-          const reviewsQuery = query(
-            collectionGroup(db, 'reviews'),
-            orderBy('createdAt', 'desc'),
-            limit(20)
-          );
-          const reviewsSnapshot = await getDocs(reviewsQuery);
-          const reviews = reviewsSnapshot.docs.map((doc) => ({
-            ...doc.data(),
-            id: doc.id
-          })) as (FoodReview & { id: string })[];
+          try {
+            // Try with orderBy first
+            const postsQuery = query(
+              collectionGroup(db, 'posts'),
+              orderBy('createdAt', 'desc'),
+              limit(20)
+            );
+            const postsSnapshot = await getDocs(postsQuery);
+            posts = postsSnapshot.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id
+            })) as (FoodPost & { id: string })[];
+            // eslint-disable-next-line no-console
+            console.log('📝 Loaded posts with orderBy:', posts.length);
+          } catch (postError: any) {
+            // eslint-disable-next-line no-console
+            console.warn('OrderBy not available, trying without:', postError.message);
+            try {
+              // Fallback: query without orderBy
+              const postsSnapshot = await getDocs(collectionGroup(db, 'posts'));
+              posts = postsSnapshot.docs.map((doc) => ({
+                ...doc.data(),
+                id: doc.id
+              })) as (FoodPost & { id: string })[];
+              // eslint-disable-next-line no-console
+              console.log('📝 Loaded posts without orderBy:', posts.length);
+            } catch (fallbackError) {
+              // eslint-disable-next-line no-console
+              console.error('Failed to load posts:', fallbackError);
+            }
+          }
+
+          try {
+            // Try with orderBy first
+            const reviewsQuery = query(
+              collectionGroup(db, 'reviews'),
+              orderBy('createdAt', 'desc'),
+              limit(20)
+            );
+            const reviewsSnapshot = await getDocs(reviewsQuery);
+            reviews = reviewsSnapshot.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id
+            })) as (FoodReview & { id: string })[];
+            // eslint-disable-next-line no-console
+            console.log('⭐ Loaded reviews with orderBy:', reviews.length);
+          } catch (reviewError: any) {
+            // eslint-disable-next-line no-console
+            console.warn('OrderBy not available, trying without:', reviewError.message);
+            try {
+              // Fallback: query without orderBy
+              const reviewsSnapshot = await getDocs(collectionGroup(db, 'reviews'));
+              reviews = reviewsSnapshot.docs.map((doc) => ({
+                ...doc.data(),
+                id: doc.id
+              })) as (FoodReview & { id: string })[];
+              // eslint-disable-next-line no-console
+              console.log('⭐ Loaded reviews without orderBy:', reviews.length);
+            } catch (fallbackError) {
+              // eslint-disable-next-line no-console
+              console.error('Failed to load reviews:', fallbackError);
+            }
+          }
 
           // Merge and sort by timestamp
           const combined = [...posts, ...reviews].sort((a, b) => {
@@ -180,6 +224,8 @@ export function TrendingScreen({ navigation }: Props) {
             return bTime - aTime;
           });
 
+          // eslint-disable-next-line no-console
+          console.log('🔥 Combined feed items:', combined.length);
           setLiveFeed(combined.slice(0, 30));
         } catch (e) {
           // eslint-disable-next-line no-console
