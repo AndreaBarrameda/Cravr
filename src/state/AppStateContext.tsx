@@ -26,7 +26,11 @@ type AppState = {
   reservationId?: string;
   onboardingComplete?: boolean;
   preferences?: string[];
-  userProfile?: { name: string };
+  userProfile?: {
+    name: string;
+    favoriteCuisine?: string;
+    favoriteFood?: string;
+  };
   isAuthenticated?: boolean;
   authUser?: AuthUser;
 };

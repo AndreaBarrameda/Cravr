@@ -93,6 +93,27 @@ export function ProfileScreen({ navigation }: Props) {
           <Text style={styles.name}>{name}</Text>
         </View>
 
+        {/* Food Preferences */}
+        {(state.userProfile?.favoriteCuisine || state.userProfile?.favoriteFood) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🍽️ Food Preferences</Text>
+            <View style={styles.preferencesCard}>
+              {state.userProfile?.favoriteCuisine && (
+                <View style={styles.preferenceRow}>
+                  <Text style={styles.preferenceLabel}>Favorite Cuisine:</Text>
+                  <Text style={styles.preferenceValue}>{state.userProfile.favoriteCuisine}</Text>
+                </View>
+              )}
+              {state.userProfile?.favoriteFood && (
+                <View style={styles.preferenceRow}>
+                  <Text style={styles.preferenceLabel}>Favorite Food:</Text>
+                  <Text style={styles.preferenceValue}>{state.userProfile.favoriteFood}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         {/* Location */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📍 Location</Text>
@@ -205,4 +226,28 @@ const styles = StyleSheet.create({
     color: '#999',
     fontStyle: 'italic'
   },
+  preferencesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0'
+  },
+  preferenceRow: {
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  preferenceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B6B6B'
+  },
+  preferenceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FF6A2A'
+  }
 });
