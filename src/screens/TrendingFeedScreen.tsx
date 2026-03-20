@@ -27,6 +27,7 @@ type TrendingRestaurant = {
   review_count: number;
   isHottest: boolean;
   isNew: boolean;
+  isFeatured: boolean;
   engagement_score: number;
   vibe_tags?: string[];
 };
@@ -100,7 +101,12 @@ export function TrendingFeedScreen({ navigation }: Props) {
               <Text style={styles.badgeText}>🔥 HOTTEST</Text>
             </View>
           )}
-          {item.isNew && (
+          {item.isFeatured && (
+            <View style={styles.featuredBadge}>
+              <Text style={styles.badgeText}>⭐ FEATURED</Text>
+            </View>
+          )}
+          {item.isNew && !item.isFeatured && (
             <View style={styles.newBadge}>
               <Text style={styles.badgeText}>✨ NEW</Text>
             </View>
@@ -269,6 +275,12 @@ const styles = StyleSheet.create({
   },
   newBadge: {
     backgroundColor: tokens.colors.primary,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.full
+  },
+  featuredBadge: {
+    backgroundColor: '#FFB800',
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
     borderRadius: tokens.radius.full
