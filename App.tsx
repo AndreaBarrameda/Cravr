@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native';
 import { tokens } from './src/theme/tokens';
+import { HomeIcon, DiscoverIcon, TrendingIcon, ProfileIcon } from './src/components/Icons';
 import { SplashCravingScreen } from './src/screens/SplashCravingScreen';
 import { CuisineSelectionScreen } from './src/screens/CuisineSelectionScreen';
 import { RestaurantDiscoveryScreen } from './src/screens/RestaurantDiscoveryScreen';
@@ -25,6 +26,7 @@ import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { DishDiscoveryScreen } from './src/screens/DishDiscoveryScreen';
 import { TrendingScreen } from './src/screens/TrendingScreen';
+import { TrendingFeedScreen } from './src/screens/TrendingFeedScreen';
 import { AppStateProvider, useAppState } from './src/state/AppStateContext';
 
 export type TabParamList = {
@@ -61,17 +63,47 @@ export type DiscoverStackParamList = {
   Confirmation: { reservationId: string };
 };
 
+export type TrendingStackParamList = {
+  TrendingHome: undefined;
+  TrendingFeed: undefined;
+  RestaurantDetail: { restaurantId: string; cravingId: string; cuisine: string; dishId?: string };
+};
+
 export type RootStackParamList = {
   Login: undefined;
   SignUp: undefined;
   MainTabs: undefined;
   OnboardingWelcome: undefined;
   OnboardingProfile: undefined;
+  SplashCraving: undefined;
+  CuisineSelection: { cravingId: string };
+  RestaurantDiscovery: { cravingId: string; cravingText?: string; cuisine: string };
+  RestaurantDetail: { restaurantId: string; cravingId: string; cuisine: string; dishId?: string };
+  DishDiscovery: { cravingId: string; cuisine: string; attributes: { temperature: string | null; flavor: string | null; texture: string | null; intensity: string | null; occasion: string | null; budget: string | null }; craving_text?: string };
+  SoloCheck: {
+    restaurantId: string;
+    dishId?: string;
+    cravingId: string;
+    cuisine: string;
+  };
+  CraveConnect: {
+    soloSessionId: string;
+  };
+  MatchSuccess: { matchId: string };
+  Chat: { matchId: string };
+  Reservation: {
+    restaurantId: string;
+    dishId?: string;
+    diningMode: 'solo' | 'group' | 'crave_connect';
+    matchId?: string;
+  };
+  Confirmation: { reservationId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 const DiscoverStack = createNativeStackNavigator<DiscoverStackParamList>();
+const TrendingStack = createNativeStackNavigator<TrendingStackParamList>();
 
 function DiscoverStackNavigator() {
   return (
@@ -132,6 +164,29 @@ function DiscoverStackNavigator() {
   );
 }
 
+function TrendingStackNavigator() {
+  return (
+    <TrendingStack.Navigator
+      screenOptions={{
+        headerShown: false
+      }}
+    >
+      <TrendingStack.Screen
+        name="TrendingHome"
+        component={TrendingScreen}
+      />
+      <TrendingStack.Screen
+        name="TrendingFeed"
+        component={TrendingFeedScreen}
+      />
+      <TrendingStack.Screen
+        name="RestaurantDetail"
+        component={RestaurantDetailScreen}
+      />
+    </TrendingStack.Navigator>
+  );
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -147,15 +202,16 @@ function MainTabs() {
           paddingBottom: 12,
           paddingTop: 10,
           shadowColor: tokens.colors.textPrimary,
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: -4 },
-          elevation: 8
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -2 },
+          elevation: 4
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '700',
-          marginTop: 4
+          marginTop: 6,
+          letterSpacing: 0.2
         }
       }}
     >
@@ -164,7 +220,9 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🏠</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <HomeIcon color={color} size={focused ? 24 : 22} />
+          )
         }}
       />
       <Tab.Screen
@@ -172,15 +230,19 @@ function MainTabs() {
         component={DiscoverStackNavigator}
         options={{
           tabBarLabel: 'Discover',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🔍</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <DiscoverIcon color={color} size={focused ? 24 : 22} />
+          )
         }}
       />
       <Tab.Screen
         name="Trending"
-        component={TrendingScreen}
+        component={TrendingStackNavigator}
         options={{
           tabBarLabel: 'Trending',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🔥</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <TrendingIcon color={color} size={focused ? 24 : 22} />
+          )
         }}
       />
       <Tab.Screen
@@ -188,7 +250,9 @@ function MainTabs() {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>👤</Text>
+          tabBarIcon: ({ color, focused }) => (
+            <ProfileIcon color={color} size={focused ? 24 : 22} />
+          )
         }}
       />
     </Tab.Navigator>

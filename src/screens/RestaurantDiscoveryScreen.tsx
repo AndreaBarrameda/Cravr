@@ -110,7 +110,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <Text style={styles.cardMeta}>
                   {item.rating ? `${item.rating.toFixed(1)} ★` : 'New'} •{' '}
-                  {'$'.repeat(item.price_level || 1)} • {item.distance_meters ? (item.distance_meters > 1000 ? `${(item.distance_meters / 1000).toFixed(1)}km` : `${item.distance_meters}m`) : '—'}
+                  {item.price_level ? `₱${item.average_price_pesos}` : '$'} • {item.distance_meters ? (item.distance_meters > 1000 ? `${(item.distance_meters / 1000).toFixed(1)}km` : `${item.distance_meters}m`) : '—'}
                 </Text>
                 {item.match_reason && (
                   <Text style={styles.cardReason}>{item.match_reason}</Text>

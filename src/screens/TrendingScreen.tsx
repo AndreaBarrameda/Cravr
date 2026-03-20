@@ -14,15 +14,12 @@ import {
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { RootStackParamList, TabParamList } from '../../App';
+import { RootStackParamList, TabParamList, TrendingStackParamList } from '../../App';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 import { tokens } from '../theme/tokens';
 
-type Props = CompositeScreenProps<
-  BottomTabScreenProps<TabParamList, 'Trending'>,
-  NativeStackScreenProps<RootStackParamList>
->;
+type Props = NativeStackScreenProps<TrendingStackParamList, 'TrendingHome'>;
 
 type TrendingRestaurant = {
   restaurant_id: string;
@@ -239,8 +236,18 @@ export function TrendingScreen({ navigation }: Props) {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>🔥 What's Trending</Text>
-          <Text style={styles.subtitle}>In Cebu right now</Text>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.title}>🔥 What's Trending</Text>
+              <Text style={styles.subtitle}>In Cebu right now</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.feedButton}
+              onPress={() => navigation.navigate('TrendingFeed')}
+            >
+              <Text style={styles.feedButtonText}>Live Feed →</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Michelin Guide Section */}
@@ -385,6 +392,11 @@ const styles = StyleSheet.create({
     paddingTop: tokens.spacing.xl,
     paddingBottom: tokens.spacing.xxl
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
   title: {
     fontSize: 32,
     fontWeight: '700',
@@ -394,6 +406,19 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: tokens.colors.textSecondary
+  },
+  feedButton: {
+    backgroundColor: tokens.colors.primary,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.md,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  feedButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: tokens.colors.textInverse
   },
   carouselSection: {
     marginBottom: tokens.spacing.xxxl

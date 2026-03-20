@@ -5,8 +5,6 @@ import {
   TextInput,
   StyleSheet,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   SafeAreaView,
   FlatList,
@@ -57,17 +55,31 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const moodShortcuts = [
-    { emoji: '🌶️', label: 'Spicy', tags: 'spicy' },
-    { emoji: '🧊', label: 'Cold', tags: 'cold' },
-    { emoji: '🥗', label: 'Fresh', tags: 'light fresh' },
-    { emoji: '🍝', label: 'Comfort', tags: 'comfort food' },
-    { emoji: '🍰', label: 'Sweet', tags: 'sweet' },
-    { emoji: '🌮', label: 'Quick', tags: 'casual' }
+  const moods = [
+    { emoji: '🌶️', label: 'Spicy', tags: 'spicy', color: '#FFE8E0' },
+    { emoji: '🧊', label: 'Refreshing', tags: 'cold', color: '#E0F2FE' },
+    { emoji: '🥗', label: 'Fresh', tags: 'light fresh', color: '#F0FDE4' },
+    { emoji: '🍲', label: 'Comfort', tags: 'comfort food', color: '#FEF0D9' },
+    { emoji: '🍰', label: 'Sweet', tags: 'sweet', color: '#FBE8F0' },
+    { emoji: '🍖', label: 'Savory', tags: 'savory', color: '#F5E6D3' },
+    { emoji: '🍟', label: 'Crispy', tags: 'crispy crunchy', color: '#FFF4E0' },
+    { emoji: '🥑', label: 'Creamy', tags: 'creamy', color: '#F0F9E8' }
+  ];
+
+  const popularDishes = [
+    { emoji: '🍜', label: 'Ramen' },
+    { emoji: '☕', label: 'Coffee' },
+    { emoji: '🍔', label: 'Burger' },
+    { emoji: '🌮', label: 'Tacos' },
+    { emoji: '🍱', label: 'Sushi' }
   ];
 
   const handleMoodTap = (tags: string) => {
     setText(tags);
+  };
+
+  const handleDishTap = (dish: string) => {
+    setText(dish);
   };
 
   return (
@@ -76,45 +88,31 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header - minimal and muted */}
-        <View style={styles.header}>
+        {/* Minimalist Header */}
+        <View style={styles.headerTopContainer}>
+          <TouchableOpacity style={styles.avatar}>
+            <Text style={styles.avatarText}>👤</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.headerTop}>
           <Text style={styles.greeting}>
-            Hey {state.userProfile?.name || 'Friend'} 👋
+            Welcome back,{'\n'}{state.userProfile?.name?.split(' ')[0] || 'Andrea'}
           </Text>
-          {state.location?.address && (
-            <View style={styles.locationBadge}>
-              <Text style={styles.locationText}>
-                📍 {state.location.address}
-              </Text>
-            </View>
-          )}
-          {/* Green freshness signal */}
-          <View style={styles.freshChip}>
-            <Text style={styles.freshDot}>●</Text>
-            <Text style={styles.freshText}>
-              Restaurants open near you
-            </Text>
-          </View>
         </View>
 
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.mainHeading}>What are you craving?</Text>
+          <Text style={styles.subtitle}>Discover new favorites near you</Text>
         </View>
 
-        {/* Main heading */}
-        <Text style={styles.mainHeading}>What are you craving today?</Text>
-
-        {/* Input card - clean minimal */}
-        <View style={styles.inputCard}>
-          <Text style={styles.inputLabel}>TYPE YOUR CRAVING</Text>
+        {/* Search Input */}
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
-            style={styles.input}
-            placeholder="spicy ramen, burger, sushi..."
+            style={styles.searchInput}
+            placeholder="spicy, creamy, fresh..."
             placeholderTextColor={tokens.colors.textTertiary}
             value={text}
             onChangeText={setText}
@@ -123,34 +121,60 @@ export function HomeScreen({ navigation }: Props) {
           />
         </View>
 
-        {/* Mood chips - horizontal scroll */}
-        <View style={styles.moodsContainer}>
-          <Text style={styles.moodsSectionLabel}>TRY A MOOD</Text>
+        {/* Browse by Mood Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>BROWSE BY MOOD</Text>
           <FlatList
-            data={moodShortcuts}
+            data={moods}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.moodChip}
+                style={[styles.moodCard, { backgroundColor: item.color }]}
                 onPress={() => handleMoodTap(item.tags)}
+                activeOpacity={0.8}
               >
-                <Text style={styles.moodChipEmoji}>{item.emoji}</Text>
-                <Text style={styles.moodChipLabel}>{item.label}</Text>
+                <Text style={styles.moodEmoji}>{item.emoji}</Text>
+                <Text style={styles.moodLabel}>{item.label}</Text>
               </TouchableOpacity>
             )}
             keyExtractor={(_, idx) => idx.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
             scrollEventThrottle={16}
-            contentContainerStyle={{ paddingRight: tokens.spacing.xl }}
+            contentContainerStyle={styles.moodListContent}
           />
         </View>
+
+        {/* Popular Now Near You Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>POPULAR NEAR YOU</Text>
+          <FlatList
+            data={popularDishes}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.dishPill}
+                onPress={() => handleDishTap(item.label.toLowerCase())}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.dishEmoji}>{item.emoji}</Text>
+                <Text style={styles.dishLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            )}
+            keyExtractor={(_, idx) => idx.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.dishListContent}
+          />
+        </View>
+
+        {/* Spacer */}
+        <View style={{ height: tokens.spacing.xxxl }} />
       </ScrollView>
 
-      {/* Footer with glow button and gradient fade */}
+      {/* CTA Footer */}
       <View style={styles.footer}>
-        <View style={styles.fadeGradient} />
         <CravrButton
-          label={loading ? 'Finding your vibe...' : 'Find food'}
+          label={loading ? 'Finding matches...' : 'Find my matches'}
           onPress={onSubmit}
           disabled={!text.trim()}
           loading={loading}
@@ -167,140 +191,194 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: tokens.spacing.xl,
-    paddingTop: tokens.spacing.lg,
-    paddingBottom: 200 // Extra space for footer
+    paddingTop: tokens.spacing.xxl,
+    paddingBottom: 100 // Space for footer
   },
-  header: {
-    marginBottom: tokens.spacing.xxxl
+  // Header Section
+  headerTopContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingBottom: tokens.spacing.lg
+  },
+  headerTop: {
+    marginBottom: tokens.spacing.xl,
+    alignItems: 'center',
+    width: '100%'
+  },
+  headerContent: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%'
   },
   greeting: {
     fontSize: 16,
     fontWeight: '500',
+    letterSpacing: 0,
+    color: '#2D3748',
+    lineHeight: 24,
+    textAlign: 'center'
+  },
+  headerSubtext: {
+    fontSize: 13,
+    fontWeight: '500',
     color: tokens.colors.textSecondary,
-    marginBottom: tokens.spacing.md
+    marginTop: tokens.spacing.xs,
+    display: 'none'
   },
-  locationBadge: {
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: tokens.colors.backgroundLight,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.md,
-    alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: tokens.colors.border,
-    marginBottom: tokens.spacing.lg
+    borderColor: tokens.colors.border
   },
-  locationText: {
-    fontSize: 12,
+  avatarText: {
+    fontSize: 20
+  },
+  locationPill: {
+    display: 'none'
+  },
+  locationIcon: {
+    fontSize: 14
+  },
+  locationAddress: {
+    fontSize: 14,
     color: tokens.colors.textSecondary,
     fontWeight: '500'
   },
-  freshChip: {
-    backgroundColor: tokens.colors.accentGreenLight,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.md,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm
+  openStatusPill: {
+    display: 'none'
   },
-  freshDot: {
+  openCheckmark: {
+    fontSize: 14,
     color: tokens.colors.accentGreen,
-    fontSize: 12,
     fontWeight: '700'
   },
-  freshText: {
-    fontSize: 12,
+  openStatus: {
+    fontSize: 14,
     color: tokens.colors.accentGreen,
     fontWeight: '600'
   },
-  logoContainer: {
+  // Hero Section
+  heroSection: {
+    marginBottom: tokens.spacing.xxl,
     alignItems: 'center',
-    marginBottom: tokens.spacing.xxxl,
-    paddingVertical: tokens.spacing.xl
-  },
-  logo: {
-    width: 100,
-    height: 100
+    width: '100%'
   },
   mainHeading: {
-    fontSize: tokens.typography.h2.fontSize,
-    fontWeight: tokens.typography.h2.fontWeight,
-    letterSpacing: tokens.typography.h2.letterSpacing,
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.xxxl,
+    fontSize: 28,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+    color: '#2D3748',
+    marginBottom: tokens.spacing.md,
+    lineHeight: 38,
     textAlign: 'center'
   },
-  inputCard: {
+  subtitle: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#718096',
+    textAlign: 'center',
+    lineHeight: 22
+  },
+  // Search
+  searchContainer: {
     backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.lg,
-    padding: tokens.spacing.lg,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    ...tokens.shadows.md,
-    marginBottom: tokens.spacing.xxxl
-  },
-  inputLabel: {
-    ...tokens.typography.label,
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.md
-  },
-  input: {
-    borderRadius: tokens.radius.lg,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.md,
-    fontSize: tokens.typography.body.fontSize,
-    backgroundColor: tokens.colors.background,
-    color: tokens.colors.textPrimary
-  },
-  moodsContainer: {
-    marginBottom: tokens.spacing.xl
-  },
-  moodsSectionLabel: {
-    ...tokens.typography.label,
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.md
-  },
-  moodChip: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.lg,
+    borderRadius: tokens.radius.xl,
     paddingHorizontal: tokens.spacing.lg,
     paddingVertical: tokens.spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: tokens.spacing.md,
+    marginBottom: tokens.spacing.xxxl,
     borderWidth: 1,
     borderColor: tokens.colors.border,
     ...tokens.shadows.sm
   },
-  moodChipEmoji: {
-    fontSize: 20,
+  searchIcon: {
+    fontSize: 18,
+    marginRight: tokens.spacing.md
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: tokens.colors.textPrimary,
+    fontWeight: '400',
+    lineHeight: 24
+  },
+  // Sections
+  section: {
+    marginBottom: tokens.spacing.xxl
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    color: '#718096',
+    marginBottom: tokens.spacing.lg,
+    textTransform: 'uppercase'
+  },
+  // Mood Cards
+  moodListContent: {
+    gap: tokens.spacing.sm,
+    paddingRight: tokens.spacing.xl
+  },
+  moodCard: {
+    borderRadius: tokens.radius.lg,
+    paddingVertical: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 90,
+    borderWidth: 0,
+    opacity: 0.9
+  },
+  moodEmoji: {
+    fontSize: 28,
     marginBottom: tokens.spacing.xs
   },
-  moodChipLabel: {
+  moodLabel: {
     fontSize: 12,
     fontWeight: '600',
     color: tokens.colors.textPrimary,
     textAlign: 'center'
   },
+  // Dish Pills
+  dishListContent: {
+    gap: tokens.spacing.sm,
+    paddingRight: tokens.spacing.xl
+  },
+  dishPill: {
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.md,
+    borderWidth: 1,
+    borderColor: tokens.colors.border
+  },
+  dishEmoji: {
+    fontSize: 16
+  },
+  dishLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: tokens.colors.textPrimary
+  },
+  // Footer
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: tokens.spacing.xl,
-    paddingBottom: tokens.spacing.xxl,
-    paddingTop: tokens.spacing.xxl,
-    backgroundColor: tokens.colors.background
-  },
-  fadeGradient: {
-    position: 'absolute',
-    top: -40,
-    left: 0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'transparent'
+    paddingVertical: tokens.spacing.lg,
+    backgroundColor: tokens.colors.background,
+    borderTopWidth: 0
   }
 });
