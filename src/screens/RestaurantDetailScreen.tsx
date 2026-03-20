@@ -41,7 +41,6 @@ type RestaurantData = {
 export function RestaurantDetailScreen({ route, navigation }: Props) {
   const { restaurantId, cravingId, cuisine, dishId } = route.params;
   const { state, setState } = useAppState();
-  const [loading, setLoading] = useState(true);
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
@@ -55,11 +54,14 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         // Extract place_id from restaurant_id (format: rst_<place_id>)
         const placeId = restaurantId.replace(/^rst_/, '');
 
-        // Fetch restaurant details
-        const detailsData = await api.getRestaurantDetails(placeId);
-        if (detailsData) {
-          setRestaurantData(detailsData);
-        }
+        // Load details in background (non-blocking)
+        api.getRestaurantDetails(placeId).then((detailsData) => {
+          if (detailsData) {
+            setRestaurantData(detailsData);
+          }
+        }).catch(() => {
+          // Silently fail - details are optional
+        });
 
         // Fetch dishes
         const dishesData = await api.discoverDishes({
@@ -86,8 +88,6 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Failed to fetch restaurant data:', e);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -106,22 +106,12 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     }
   };
 
-  if (loading) {
-    return (
-      <ScreenContainer>
-        <View style={styles.loading}>
-          <ActivityIndicator color="#FF6A2A" />
-        </View>
-      </ScreenContainer>
-    );
-  }
-
   return (
     <ScrollView style={styles.container}>
       <ScreenContainer>
+        {/* Restaurant Header - shows loading state while details load */}
         {restaurantData ? (
           <>
-            {/* Restaurant Header */}
             {restaurantData.hero_photo_url && (
               <Image
                 source={{ uri: restaurantData.hero_photo_url }}
@@ -157,68 +147,69 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                 </View>
               )}
             </View>
-
-            {/* Menu Items */}
-            <View style={styles.menuSection}>
-              <Text style={styles.sectionTitle}>Recommended Dishes</Text>
-
-              {dishes.length > 0 ? (
-                dishes.map((dish) => (
-                  <TouchableOpacity
-                    key={dish.dish_id}
-                    style={[
-                      styles.dishCard,
-                      selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
-                    ]}
-                    onPress={() => setSelectedDish(dish)}
-                  >
-                    {dish.photo_url && (
-                      <Image
-                        source={{ uri: dish.photo_url }}
-                        style={styles.dishImage}
-                      />
-                    )}
-                    <View style={styles.dishInfo}>
-                      <View style={styles.dishHeader}>
-                        <Text style={styles.dishName}>{dish.name}</Text>
-                        <Text style={styles.dishPrice}>
-                          ₱{dish.price.toFixed(0)}
-                        </Text>
-                      </View>
-                      <Text style={styles.dishDescription} numberOfLines={2}>
-                        {dish.description}
-                      </Text>
-                      <View style={styles.matchScore}>
-                        <Text style={styles.matchScoreText}>
-                          ✨ {Math.round(dish.match_score * 100)}% match
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.emptyText}>
-                    No recommended dishes available
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Continue Button */}
-            <View style={styles.footer}>
-              <CravrButton
-                label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
-                onPress={onContinue}
-              />
-            </View>
           </>
         ) : (
-          <View style={styles.loadingPlaceholder}>
-            <ActivityIndicator color="#FF6A2A" />
-            <Text style={styles.loadingText}>Loading restaurant info...</Text>
+          <View style={styles.skeletonHeader}>
+            <View style={styles.skeletonLine} />
+            <View style={styles.skeletonLine} />
+            <View style={styles.skeletonInfoCard} />
           </View>
         )}
+
+        {/* Menu Items - render immediately, don't block on restaurant data */}
+        <View style={styles.menuSection}>
+          <Text style={styles.sectionTitle}>Recommended Dishes</Text>
+
+          {dishes.length > 0 ? (
+            dishes.map((dish) => (
+              <TouchableOpacity
+                key={dish.dish_id}
+                style={[
+                  styles.dishCard,
+                  selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
+                ]}
+                onPress={() => setSelectedDish(dish)}
+              >
+                {dish.photo_url && (
+                  <Image
+                    source={{ uri: dish.photo_url }}
+                    style={styles.dishImage}
+                  />
+                )}
+                <View style={styles.dishInfo}>
+                  <View style={styles.dishHeader}>
+                    <Text style={styles.dishName}>{dish.name}</Text>
+                    <Text style={styles.dishPrice}>
+                      ₱{dish.price.toFixed(0)}
+                    </Text>
+                  </View>
+                  <Text style={styles.dishDescription} numberOfLines={2}>
+                    {dish.description}
+                  </Text>
+                  <View style={styles.matchScore}>
+                    <Text style={styles.matchScoreText}>
+                      ✨ {Math.round(dish.match_score * 100)}% match
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>
+                No recommended dishes available
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Continue Button */}
+        <View style={styles.footer}>
+          <CravrButton
+            label={selectedDish ? 'Continue' : 'Skip Dish Selection'}
+            onPress={onContinue}
+          />
+        </View>
       </ScreenContainer>
     </ScrollView>
   );
@@ -391,5 +382,21 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 20,
     marginBottom: 40
+  },
+  skeletonHeader: {
+    marginBottom: 20
+  },
+  skeletonLine: {
+    height: 24,
+    backgroundColor: '#E8E8E8',
+    borderRadius: 8,
+    marginBottom: 12
+  },
+  skeletonInfoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    height: 120,
+    backgroundColor: '#F5F5F5'
   }
 });

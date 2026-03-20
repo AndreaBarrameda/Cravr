@@ -17,6 +17,8 @@ import { ReservationScreen } from './src/screens/ReservationScreen';
 import { ConfirmationScreen } from './src/screens/ConfirmationScreen';
 import { OnboardingWelcomeScreen } from './src/screens/OnboardingWelcomeScreen';
 import { OnboardingProfileScreen } from './src/screens/OnboardingProfileScreen';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { SignUpScreen } from './src/screens/SignUpScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -30,6 +32,8 @@ export type TabParamList = {
 };
 
 export type RootStackParamList = {
+  Login: undefined;
+  SignUp: undefined;
   MainTabs: undefined;
   OnboardingWelcome: undefined;
   OnboardingProfile: undefined;
@@ -111,17 +115,46 @@ function MainTabs() {
 
 function AppContent() {
   const { state } = useAppState();
+  const navigationRef = React.useRef<any>(null);
+
+  let initialRouteName: keyof RootStackParamList = 'Login';
+  if (state.isAuthenticated) {
+    initialRouteName = state.onboardingComplete ? 'MainTabs' : 'OnboardingWelcome';
+  }
+
+  React.useEffect(() => {
+    // Reset navigation when auth state changes
+    if (navigationRef.current) {
+      if (state.isAuthenticated) {
+        navigationRef.current.reset({
+          index: 0,
+          routes: [
+            {
+              name: state.onboardingComplete ? 'MainTabs' : 'OnboardingWelcome'
+            }
+          ]
+        });
+      } else {
+        navigationRef.current.reset({
+          index: 0,
+          routes: [{ name: 'Login' }]
+        });
+      }
+    }
+  }, [state.isAuthenticated, state.onboardingComplete]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <StatusBar style="dark" />
       <Stack.Navigator
-        initialRouteName={state.onboardingComplete ? 'MainTabs' : 'OnboardingWelcome'}
+        initialRouteName={initialRouteName}
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: '#FFF8F3' }
         }}
       >
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="OnboardingWelcome" component={OnboardingWelcomeScreen} />
         <Stack.Screen name="OnboardingProfile" component={OnboardingProfileScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />

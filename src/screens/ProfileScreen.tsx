@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -15,6 +16,7 @@ import { RootStackParamList, TabParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { getLocationWithUserConsent } from '../services/locationService';
+import { logout } from '../services/firebaseClient';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Profile'>,
@@ -55,6 +57,31 @@ export function ProfileScreen({ navigation }: Props) {
     navigation.navigate('OnboardingWelcome');
   };
 
+  const handleLogout = async () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+            setState((prev) => ({
+              ...prev,
+              isAuthenticated: false,
+              authUser: undefined,
+              onboardingComplete: false,
+              userProfile: undefined
+            }));
+            navigation.navigate('Login');
+          } catch (error) {
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
+          }
+        }
+      }
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -92,6 +119,15 @@ export function ProfileScreen({ navigation }: Props) {
         {/* Onboarding */}
         <View style={styles.section}>
           <CravrButton label="Re-run Onboarding" onPress={handleReRunOnboarding} />
+        </View>
+
+        {/* Sign Out */}
+        <View style={styles.section}>
+          <CravrButton
+            label="Sign Out"
+            onPress={handleLogout}
+            variant="secondary"
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
