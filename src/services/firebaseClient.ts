@@ -3,7 +3,8 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updateProfile
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -29,6 +30,12 @@ export type AuthUser = {
 export async function signUp(email: string, password: string, name: string) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+    // Save the user's name to Firebase profile
+    await updateProfile(userCredential.user, {
+      displayName: name
+    });
+
     return {
       user: {
         id: userCredential.user.uid,
