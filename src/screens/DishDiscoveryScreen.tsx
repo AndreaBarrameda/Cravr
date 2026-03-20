@@ -13,8 +13,10 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
+import { RestaurantCard } from '../components/RestaurantCard';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { tokens } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'DishDiscovery'>;
 
@@ -82,7 +84,7 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color="#FF6A2A" size="large" />
+          <ActivityIndicator color={tokens.colors.primary} size="large" />
           <Text style={styles.loadingText}>Finding restaurants...</Text>
         </View>
       </SafeAreaView>
@@ -114,60 +116,49 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
         <FlatList
           data={restaurants}
           keyExtractor={(item) => item.restaurant_id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.restaurantName}>{item.restaurant_name}</Text>
-              <Text style={styles.reason}>{item.match_reason}</Text>
-
-              <View style={styles.statsRow}>
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>⭐ Rating</Text>
-                  <Text style={styles.statValue}>{item.rating.toFixed(1)}</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>💰 Est. Price</Text>
-                  <Text style={styles.statValue}>₱{item.price.toFixed(0)}</Text>
-                </View>
-                <View style={styles.stat}>
-                  <Text style={styles.statLabel}>✨ Match</Text>
-                  <Text style={styles.statValue}>{Math.round(item.match_score * 100)}%</Text>
-                </View>
-              </View>
-
-              <Text style={styles.menuLabel}>View Real Menu:</Text>
-
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => {
+          renderItem={({ item, index }) => (
+            <View>
+              <RestaurantCard
+                restaurantName={item.restaurant_name}
+                matchScore={item.match_score}
+                matchReason={item.match_reason}
+                rating={item.rating}
+                price={item.price}
+                cuisine={cuisine || 'Mixed'}
+                onSwipeYes={() => {
                   const searchUrl = `https://www.google.com/maps/search/${encodeURIComponent(item.restaurant_name)}`;
                   Linking.openURL(searchUrl);
                 }}
-              >
-                <Text style={styles.menuButtonIcon}>📍</Text>
-                <Text style={styles.menuButtonText}>Google Maps</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => {
-                  const searchUrl = `https://www.grabfood.com/ph/search?q=${encodeURIComponent(item.restaurant_name)}`;
-                  Linking.openURL(searchUrl);
+                onSwipeNo={() => {
+                  // Could implement dismissing the card here
+                  console.log(`Dismissed: ${item.restaurant_name}`);
                 }}
-              >
-                <Text style={styles.menuButtonIcon}>🍽️</Text>
-                <Text style={styles.menuButtonText}>GrabFood</Text>
-              </TouchableOpacity>
+              />
 
-              <TouchableOpacity
-                style={styles.menuButton}
-                onPress={() => {
-                  const searchUrl = `https://www.foodpanda.ph/search?q=${encodeURIComponent(item.restaurant_name)}`;
-                  Linking.openURL(searchUrl);
-                }}
-              >
-                <Text style={styles.menuButtonIcon}>🎯</Text>
-                <Text style={styles.menuButtonText}>Foodpanda</Text>
-              </TouchableOpacity>
+              {/* Secondary action buttons */}
+              <View style={styles.secondaryActionsContainer}>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    const searchUrl = `https://www.grabfood.com/ph/search?q=${encodeURIComponent(item.restaurant_name)}`;
+                    Linking.openURL(searchUrl);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonIcon}>🍽️</Text>
+                  <Text style={styles.secondaryButtonText}>GrabFood</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    const searchUrl = `https://www.foodpanda.ph/search?q=${encodeURIComponent(item.restaurant_name)}`;
+                    Linking.openURL(searchUrl);
+                  }}
+                >
+                  <Text style={styles.secondaryButtonIcon}>🎯</Text>
+                  <Text style={styles.secondaryButtonText}>Foodpanda</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           contentContainerStyle={styles.listContent}
@@ -181,7 +172,7 @@ export function DishDiscoveryScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F3'
+    backgroundColor: tokens.colors.background
   },
   loadingContainer: {
     flex: 1,
@@ -189,105 +180,60 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: tokens.spacing.md,
     fontSize: 16,
-    color: '#6B6B6B'
+    color: tokens.colors.textSecondary
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#161616',
-    marginBottom: 4
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B6B6B',
-    marginBottom: 16
+    color: tokens.colors.textSecondary,
+    marginBottom: tokens.spacing.lg
   },
   listContent: {
-    paddingBottom: 24
+    paddingBottom: tokens.spacing.xxl
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
-  },
-  restaurantName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#161616',
-    marginBottom: 8
-  },
-  reason: {
-    fontSize: 13,
-    color: '#FF6A2A',
-    fontWeight: '500',
-    marginBottom: 12,
-    fontStyle: 'italic'
-  },
-  statsRow: {
+  secondaryActionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0'
+    gap: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg,
+    paddingHorizontal: tokens.spacing.xl
   },
-  stat: {
-    alignItems: 'center'
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#999',
-    marginBottom: 4
-  },
-  statValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#161616'
-  },
-  menuLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#161616',
-    marginBottom: 8,
-    marginTop: 4
-  },
-  menuButton: {
+  secondaryButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0E6',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 8,
+    justifyContent: 'center',
+    backgroundColor: tokens.colors.primaryTint,
+    borderRadius: tokens.radius.md,
+    paddingVertical: tokens.spacing.md,
     borderWidth: 1,
-    borderColor: '#FFE0CF'
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
   },
-  menuButtonIcon: {
-    fontSize: 16,
-    marginRight: 8
+  secondaryButtonIcon: {
+    fontSize: 14,
+    marginRight: tokens.spacing.sm
   },
-  menuButtonText: {
-    fontSize: 13,
+  secondaryButtonText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#FF6A2A'
+    color: tokens.colors.primary
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#161616',
-    marginBottom: 8
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B6B6B',
-    marginBottom: 24
+    color: tokens.colors.textSecondary,
+    marginBottom: tokens.spacing.xxl
   }
 });

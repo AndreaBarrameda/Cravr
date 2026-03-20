@@ -8,7 +8,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  SafeAreaView
+  SafeAreaView,
+  FlatList,
+  Image
 } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,6 +19,7 @@ import { RootStackParamList, TabParamList } from '../../App';
 import { CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { tokens } from '../theme/tokens';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Home'>,
@@ -46,11 +49,8 @@ export function HomeScreen({ navigation }: Props) {
           suggested_cuisines: result.suggested_cuisines ?? []
         }
       }));
-      // Navigate to Discover tab (which contains the discover stack)
-      // The DiscoverScreen will handle navigation from there
       navigation.navigate('Discover' as any);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error(e);
     } finally {
       setLoading(false);
@@ -58,10 +58,12 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   const moodShortcuts = [
-    { emoji: '🌶️', label: 'Something Spicy', tags: 'spicy' },
-    { emoji: '🥣', label: 'Comfort Food', tags: 'comfort food' },
-    { emoji: '🥗', label: 'Light & Fresh', tags: 'light fresh' },
-    { emoji: '🍰', label: 'Sweet Treats', tags: 'sweet' }
+    { emoji: '🌶️', label: 'Spicy', tags: 'spicy' },
+    { emoji: '🧊', label: 'Cold', tags: 'cold' },
+    { emoji: '🥗', label: 'Fresh', tags: 'light fresh' },
+    { emoji: '🍝', label: 'Comfort', tags: 'comfort food' },
+    { emoji: '🍰', label: 'Sweet', tags: 'sweet' },
+    { emoji: '🌮', label: 'Quick', tags: 'casual' }
   ];
 
   const handleMoodTap = (tags: string) => {
@@ -74,23 +76,46 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Header - minimal and muted */}
         <View style={styles.header}>
           <Text style={styles.greeting}>
-            Hi, {state.userProfile?.name || 'Friend'}
+            Hey {state.userProfile?.name || 'Friend'} 👋
           </Text>
           {state.location?.address && (
             <View style={styles.locationBadge}>
-              <Text style={styles.locationText}>📍 {state.location.address}</Text>
+              <Text style={styles.locationText}>
+                📍 {state.location.address}
+              </Text>
             </View>
           )}
+          {/* Green freshness signal */}
+          <View style={styles.freshChip}>
+            <Text style={styles.freshDot}>●</Text>
+            <Text style={styles.freshText}>
+              Restaurants open near you
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>What are you craving?</Text>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Main heading */}
+        <Text style={styles.mainHeading}>What are you craving today?</Text>
+
+        {/* Input card - clean minimal */}
+        <View style={styles.inputCard}>
+          <Text style={styles.inputLabel}>TYPE YOUR CRAVING</Text>
           <TextInput
             style={styles.input}
-            placeholder="Type something like 'spicy ramen'"
-            placeholderTextColor="#C2B6AF"
+            placeholder="spicy ramen, burger, sushi..."
+            placeholderTextColor={tokens.colors.textTertiary}
             value={text}
             onChangeText={setText}
             returnKeyType="done"
@@ -98,26 +123,34 @@ export function HomeScreen({ navigation }: Props) {
           />
         </View>
 
-        <View style={styles.moods}>
-          <Text style={styles.moodyLabel}>Try a mood</Text>
-          <View style={styles.moodGrid}>
-            {moodShortcuts.map((mood, idx) => (
+        {/* Mood chips - horizontal scroll */}
+        <View style={styles.moodsContainer}>
+          <Text style={styles.moodsSectionLabel}>TRY A MOOD</Text>
+          <FlatList
+            data={moodShortcuts}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                key={idx}
-                style={styles.moodCard}
-                onPress={() => handleMoodTap(mood.tags)}
+                style={styles.moodChip}
+                onPress={() => handleMoodTap(item.tags)}
               >
-                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-                <Text style={styles.moodText}>{mood.label}</Text>
+                <Text style={styles.moodChipEmoji}>{item.emoji}</Text>
+                <Text style={styles.moodChipLabel}>{item.label}</Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            )}
+            keyExtractor={(_, idx) => idx.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            contentContainerStyle={{ paddingRight: tokens.spacing.xl }}
+          />
         </View>
       </ScrollView>
 
+      {/* Footer with glow button and gradient fade */}
       <View style={styles.footer}>
+        <View style={styles.fadeGradient} />
         <CravrButton
-          label="Find food"
+          label={loading ? 'Finding your vibe...' : 'Find food'}
           onPress={onSubmit}
           disabled={!text.trim()}
           loading={loading}
@@ -130,103 +163,144 @@ export function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F3'
+    backgroundColor: tokens.colors.background
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.lg,
+    paddingBottom: 200 // Extra space for footer
   },
   header: {
-    marginBottom: 32
+    marginBottom: tokens.spacing.xxxl
   },
   greeting: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#161616',
-    marginBottom: 12
+    fontSize: 16,
+    fontWeight: '500',
+    color: tokens.colors.textSecondary,
+    marginBottom: tokens.spacing.md
   },
   locationBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    backgroundColor: tokens.colors.backgroundLight,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.md,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#FFE0CF'
+    borderColor: tokens.colors.border,
+    marginBottom: tokens.spacing.lg
   },
   locationText: {
-    fontSize: 13,
-    color: '#6B6B6B',
+    fontSize: 12,
+    color: tokens.colors.textSecondary,
     fontWeight: '500'
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-    marginBottom: 32
+  freshChip: {
+    backgroundColor: tokens.colors.accentGreenLight,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.md,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#161616'
+  freshDot: {
+    color: tokens.colors.accentGreen,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  freshText: {
+    fontSize: 12,
+    color: tokens.colors.accentGreen,
+    fontWeight: '600'
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: tokens.spacing.xxxl,
+    paddingVertical: tokens.spacing.xl
+  },
+  logo: {
+    width: 100,
+    height: 100
+  },
+  mainHeading: {
+    fontSize: tokens.typography.h2.fontSize,
+    fontWeight: tokens.typography.h2.fontWeight,
+    letterSpacing: tokens.typography.h2.letterSpacing,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.xxxl,
+    textAlign: 'center'
+  },
+  inputCard: {
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.md,
+    marginBottom: tokens.spacing.xxxl
+  },
+  inputLabel: {
+    ...tokens.typography.label,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md
   },
   input: {
-    borderRadius: 18,
+    borderRadius: tokens.radius.lg,
     borderWidth: 1,
-    borderColor: '#FFE0CF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#FFF8F3',
-    color: '#161616'
+    borderColor: tokens.colors.border,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.md,
+    fontSize: tokens.typography.body.fontSize,
+    backgroundColor: tokens.colors.background,
+    color: tokens.colors.textPrimary
   },
-  moods: {
-    marginBottom: 24
+  moodsContainer: {
+    marginBottom: tokens.spacing.xl
   },
-  moodyLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#161616',
-    marginBottom: 12
+  moodsSectionLabel: {
+    ...tokens.typography.label,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md
   },
-  moodGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12
-  },
-  moodCard: {
-    width: '47%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+  moodChip: {
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2
+    marginRight: tokens.spacing.md,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
   },
-  moodEmoji: {
-    fontSize: 32,
-    marginBottom: 8
+  moodChipEmoji: {
+    fontSize: 20,
+    marginBottom: tokens.spacing.xs
   },
-  moodText: {
-    fontSize: 13,
+  moodChipLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#161616',
+    color: tokens.colors.textPrimary,
     textAlign: 'center'
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    backgroundColor: '#FFF8F3'
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xxl,
+    paddingTop: tokens.spacing.xxl,
+    backgroundColor: tokens.colors.background
+  },
+  fadeGradient: {
+    position: 'absolute',
+    top: -40,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: 'transparent'
   }
 });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { tokens } from '../theme/tokens';
 
 type ButtonProps = {
   label: string;
@@ -29,7 +30,7 @@ export function CravrButton({
       activeOpacity={0.8}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? '#FFFFFF' : '#FF6A2A'} />
+        <ActivityIndicator color={isPrimary ? tokens.colors.textInverse : tokens.colors.primary} />
       ) : (
         <Text style={isPrimary ? styles.buttonTextPrimary : styles.buttonTextSecondary}>
           {label}
@@ -51,35 +52,36 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     flexDirection: 'column',
-    backgroundColor: '#FFF8F3',
-    paddingHorizontal: 20,
+    backgroundColor: tokens.colors.background,
+    paddingHorizontal: tokens.spacing.xl,
     paddingTop: 60,
-    paddingBottom: 24
+    paddingBottom: tokens.spacing.xxl
   },
   button: {
-    borderRadius: 18,
+    borderRadius: tokens.radius.lg,
     height: 56,
     alignItems: 'center',
     justifyContent: 'center'
   },
   buttonPrimary: {
-    backgroundColor: '#FF6A2A'
+    backgroundColor: tokens.colors.primary,
+    ...tokens.glows.primaryGlow
   },
   buttonSecondary: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: tokens.colors.backgroundLight,
     borderWidth: 1,
-    borderColor: '#FFD0B5'
+    borderColor: tokens.colors.border
   },
   buttonDisabled: {
     opacity: 0.5
   },
   buttonTextPrimary: {
-    color: '#FFFFFF',
+    color: tokens.colors.textInverse,
     fontSize: 16,
     fontWeight: '600'
   },
   buttonTextSecondary: {
-    color: '#FF6A2A',
+    color: tokens.colors.primary,
     fontSize: 16,
     fontWeight: '600'
   }

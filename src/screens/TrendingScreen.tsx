@@ -17,6 +17,7 @@ import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { RootStackParamList, TabParamList } from '../../App';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { tokens } from '../theme/tokens';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Trending'>,
@@ -36,6 +37,13 @@ type TrendingRestaurant = {
   vibe_tags?: string[];
 };
 
+type MichelinRestaurant = {
+  name: string;
+  designation: 'plate' | 'bibGourmand';
+  cuisine?: string;
+  price_level?: number;
+};
+
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
 
@@ -43,20 +51,20 @@ const getMichelinBadge = (designation?: string, label?: string) => {
   if (!designation) return null;
 
   let icon = '';
-  let color = '#999';
+  let color = tokens.colors.textTertiary;
 
   switch (designation) {
     case 'bibGourmand':
       icon = '🤤 Bib Gourmand';
-      color = '#FF6A2A';
+      color = tokens.colors.primary;
       break;
     case 'plate':
       icon = '🍽️ Michelin Selection';
-      color = '#6B6B6B';
+      color = tokens.colors.textSecondary;
       break;
     case '1-star':
       icon = '⭐ Michelin ★';
-      color = '#FF6A2A';
+      color = tokens.colors.primary;
       break;
     case '2-star':
       icon = '⭐⭐ Michelin ★★';
@@ -77,17 +85,24 @@ export function TrendingScreen({ navigation }: Props) {
   const { state } = useAppState();
   const [loading, setLoading] = useState(true);
   const [allRestaurants, setAllRestaurants] = useState<TrendingRestaurant[]>([]);
+  const [michelinGuide, setMichelinGuide] = useState<{ bib_gourmand: MichelinRestaurant[]; michelin_selection: MichelinRestaurant[] }>({ bib_gourmand: [], michelin_selection: [] });
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   useEffect(() => {
-    const fetchTrending = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const location = state.location
           ? { lat: state.location.latitude, lng: state.location.longitude }
           : { lat: 10.3157, lng: 123.8854 };
 
-        // Create a timeout promise (5 seconds)
+        // Fetch Michelin Guide (fast, no timeout needed)
+        const michelinData = await api.getMichelinGuide();
+        // eslint-disable-next-line no-console
+        console.log('🏆 Michelin data loaded:', michelinData.total, 'restaurants');
+        setMichelinGuide(michelinData);
+
+        // Create a timeout promise for trending (5 seconds)
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Request timeout')), 5000)
         );
@@ -107,7 +122,7 @@ export function TrendingScreen({ navigation }: Props) {
         setAllRestaurants(data.results?.slice(0, 15) || []);
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error('Failed to fetch trending:', e);
+        console.error('Failed to fetch data:', e);
         // Show empty state instead of error
         setAllRestaurants([]);
       } finally {
@@ -115,7 +130,7 @@ export function TrendingScreen({ navigation }: Props) {
       }
     };
 
-    fetchTrending();
+    fetchData();
   }, [state.location]);
 
   // Organize restaurants by category
@@ -212,7 +227,7 @@ export function TrendingScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color="#FF6A2A" size="large" />
+          <ActivityIndicator color={tokens.colors.primary} size="large" />
           <Text style={styles.loadingText}>Discovering trending spots...</Text>
         </View>
       </SafeAreaView>
@@ -227,6 +242,55 @@ export function TrendingScreen({ navigation }: Props) {
           <Text style={styles.title}>🔥 What's Trending</Text>
           <Text style={styles.subtitle}>In Cebu right now</Text>
         </View>
+
+        {/* Michelin Guide Section */}
+        {(michelinGuide.bib_gourmand.length > 0 || michelinGuide.michelin_selection.length > 0) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>MICHELIN GUIDE</Text>
+
+            {michelinGuide.bib_gourmand.length > 0 && (
+              <>
+                <Text style={styles.subsectionTitle}>🤤 Bib Gourmand</Text>
+                {michelinGuide.bib_gourmand.map((restaurant) => (
+                  <View key={restaurant.name} style={styles.michelinCard}>
+                    <View style={styles.michelinCardContent}>
+                      <View>
+                        <Text style={styles.michelinCardName}>{restaurant.name}</Text>
+                        <Text style={styles.michelinCardMeta}>
+                          {restaurant.cuisine} • {'$'.repeat(restaurant.price_level || 1)}
+                        </Text>
+                      </View>
+                      <View style={[styles.michelinBadge, { backgroundColor: '#FF6A2A' }]}>
+                        <Text style={styles.michelinBadgeText}>🤤</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {michelinGuide.michelin_selection.length > 0 && (
+              <>
+                <Text style={styles.subsectionTitle}>🍽️ Michelin Selection</Text>
+                {michelinGuide.michelin_selection.map((restaurant) => (
+                  <View key={restaurant.name} style={styles.michelinCard}>
+                    <View style={styles.michelinCardContent}>
+                      <View>
+                        <Text style={styles.michelinCardName}>{restaurant.name}</Text>
+                        <Text style={styles.michelinCardMeta}>
+                          {restaurant.cuisine} • {'$'.repeat(restaurant.price_level || 1)}
+                        </Text>
+                      </View>
+                      <View style={[styles.michelinBadge, { backgroundColor: '#6B6B6B' }]}>
+                        <Text style={styles.michelinBadgeText}>🍽️</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+        )}
 
         {/* Carousel Section */}
         {trendingRestaurants.length > 0 && (
@@ -263,10 +327,10 @@ export function TrendingScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Michelin Guide Section */}
+        {/* Michelin Restaurants Section */}
         {michelinRestaurants.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏆 Michelin Guide</Text>
+            <Text style={styles.sectionTitle}>MICHELIN HONORED</Text>
             {michelinRestaurants.slice(0, 5).map((restaurant) => (
               <View key={restaurant.restaurant_id}>
                 {renderSmallCard({ item: restaurant })}
@@ -278,7 +342,7 @@ export function TrendingScreen({ navigation }: Props) {
         {/* Top Rated Section */}
         {topRatedRestaurants.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⭐ Top Rated</Text>
+            <Text style={styles.sectionTitle}>TOP RATED</Text>
             {topRatedRestaurants.map((restaurant, idx) => (
               <View key={restaurant.restaurant_id}>
                 {renderSmallCard({ item: restaurant })}
@@ -289,7 +353,7 @@ export function TrendingScreen({ navigation }: Props) {
 
         {/* All Trending Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📈 Trending This Week</Text>
+          <Text style={styles.sectionTitle}>TRENDING THIS WEEK</Text>
           {trendingRestaurants.slice(0, 8).map((restaurant) => (
             <View key={restaurant.restaurant_id}>
               {renderSmallCard({ item: restaurant })}
@@ -304,7 +368,7 @@ export function TrendingScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F3'
+    backgroundColor: tokens.colors.background
   },
   loadingContainer: {
     flex: 1,
@@ -312,42 +376,38 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: tokens.spacing.md,
     fontSize: 14,
-    color: '#6B6B6B'
+    color: tokens.colors.textSecondary
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xxl
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#161616',
-    marginBottom: 4
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B6B6B'
+    color: tokens.colors.textSecondary
   },
   carouselSection: {
-    marginBottom: 32
+    marginBottom: tokens.spacing.xxxl
   },
   carouselContent: {
-    paddingHorizontal: 20,
-    gap: 20
+    paddingHorizontal: tokens.spacing.xl,
+    gap: tokens.spacing.xl
   },
   carouselCard: {
     width: CARD_WIDTH,
     height: 320,
-    borderRadius: 20,
+    borderRadius: tokens.radius.xl,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 5
+    ...tokens.shadows.lg
   },
   carouselImage: {
     width: '100%',
@@ -359,70 +419,67 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: 20,
-    paddingBottom: 24
+    padding: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xxl
   },
-  carouselContent: {
-    gap: 12
+  carouselContentGap: {
+    gap: tokens.spacing.md
   },
   carouselName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFFFFF'
+    color: tokens.colors.textInverse
   },
   carouselMeta: {
     fontSize: 14,
-    color: '#FFFFFF',
+    color: tokens.colors.textInverse,
     fontWeight: '500'
   },
   carouselMichelinBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.md,
     alignSelf: 'flex-start'
   },
   carouselMichelinText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF'
+    color: tokens.colors.textInverse
   },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 16,
-    paddingBottom: 16
+    gap: tokens.spacing.sm,
+    marginTop: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.lg
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#DDD'
+    backgroundColor: tokens.colors.border
   },
   dotActive: {
-    backgroundColor: '#FF6A2A',
+    backgroundColor: tokens.colors.primary,
     width: 24
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 32
+    paddingHorizontal: tokens.spacing.xl,
+    marginBottom: tokens.spacing.xxxl
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#161616',
-    marginBottom: 16
+    ...tokens.typography.label,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.lg
   },
   smallCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.md,
+    padding: tokens.spacing.md,
+    marginBottom: tokens.spacing.md,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
   },
   smallCardContent: {
     flexDirection: 'row',
@@ -432,22 +489,66 @@ const styles = StyleSheet.create({
   smallCardName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#161616',
-    marginBottom: 4
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.xs
   },
   smallCardMeta: {
     fontSize: 12,
-    color: '#6B6B6B',
+    color: tokens.colors.textSecondary,
     fontWeight: '500'
   },
   smallMichelinBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: tokens.spacing.xs,
+    borderRadius: tokens.radius.sm
   },
   smallMichelinText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#FFFFFF'
+    color: tokens.colors.textInverse
+  },
+  subsectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: tokens.colors.primary,
+    marginBottom: tokens.spacing.md,
+    marginTop: tokens.spacing.lg
+  },
+  michelinCard: {
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.md,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: tokens.colors.primary,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
+  },
+  michelinCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  michelinCardName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.xs
+  },
+  michelinCardMeta: {
+    fontSize: 12,
+    color: tokens.colors.textSecondary,
+    fontWeight: '500'
+  },
+  michelinBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  michelinBadgeText: {
+    fontSize: 20
   }
 });

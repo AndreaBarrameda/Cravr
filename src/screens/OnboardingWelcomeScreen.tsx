@@ -1,57 +1,68 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import { tokens } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingWelcome'>;
 
 export function OnboardingWelcomeScreen({ navigation }: Props) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.logo}>CRAVR</Text>
-      <Text style={styles.tagline}>Your cravings, matched.</Text>
-      <View style={{ flex: 1 }} />
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('OnboardingProfile')}
-      >
-        <Text style={styles.buttonText}>Let's get started</Text>
-      </TouchableOpacity>
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {/* Centered Logo */}
+        <View style={styles.logoCenter}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logoImageLarge}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* CTA Button */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('OnboardingProfile')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.buttonText}>Let's get started</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F3',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 24
+    backgroundColor: tokens.colors.background
   },
-  logo: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#FF6A2A',
-    letterSpacing: 2,
-    marginBottom: 12
+  content: {
+    flex: 1,
+    paddingHorizontal: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xl,
+    justifyContent: 'space-between'
   },
-  tagline: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#161616',
-    marginBottom: 40
-  },
-  button: {
-    backgroundColor: '#FF6A2A',
-    borderRadius: 18,
-    height: 56,
+  logoCenter: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center'
   },
+  logoImageLarge: {
+    width: 280,
+    height: 280
+  },
+  button: {
+    backgroundColor: tokens.colors.primary,
+    borderRadius: tokens.radius.lg,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...tokens.glows.primaryGlow
+  },
   buttonText: {
-    color: '#FFFFFF',
+    color: tokens.colors.textInverse,
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: '700'
   }
 });

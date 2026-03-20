@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native';
+import { tokens } from './src/theme/tokens';
 import { SplashCravingScreen } from './src/screens/SplashCravingScreen';
 import { CuisineSelectionScreen } from './src/screens/CuisineSelectionScreen';
 import { RestaurantDiscoveryScreen } from './src/screens/RestaurantDiscoveryScreen';
@@ -136,18 +137,25 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#FF6A2A',
-        tabBarInactiveTintColor: '#C2B6AF',
+        tabBarActiveTintColor: tokens.colors.primary,
+        tabBarInactiveTintColor: tokens.colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#F0F0F0',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8
+          backgroundColor: tokens.colors.backgroundLight,
+          borderTopWidth: 1,
+          borderTopColor: tokens.colors.border,
+          height: 64,
+          paddingBottom: 12,
+          paddingTop: 10,
+          shadowColor: tokens.colors.textPrimary,
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 },
+          elevation: 8
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600'
+          fontWeight: '700',
+          marginTop: 4
         }
       }}
     >
@@ -224,7 +232,7 @@ function AppContent() {
         initialRouteName={initialRouteName}
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#FFF8F3' }
+          contentStyle: { backgroundColor: tokens.colors.background }
         }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />

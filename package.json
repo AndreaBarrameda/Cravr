@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.99.3",
     "expo": "~52.0.0",
     "expo-asset": "~55.0.0",
+    "expo-linear-gradient": "~14.0.2",
     "expo-location": "~17.0.1",
     "expo-status-bar": "~2.0.0",
     "firebase": "^12.11.0",

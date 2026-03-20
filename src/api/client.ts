@@ -149,6 +149,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ text })
     });
+  },
+
+  getMichelinGuide() {
+    return request('/discovery/michelin');
   }
 };
 

@@ -7,8 +7,10 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -17,6 +19,7 @@ import { CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { getLocationWithUserConsent } from '../services/locationService';
 import { logout } from '../services/firebaseClient';
+import { tokens } from '../theme/tokens';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Profile'>,
@@ -85,29 +88,39 @@ export function ProfileScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Avatar and name */}
+        {/* Logo and Avatar and name */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.profileLogo}
+            resizeMode="contain"
+          />
+          <LinearGradient
+            colors={[tokens.colors.primary, '#FF8555']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
+          >
             <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          </LinearGradient>
           <Text style={styles.name}>{name}</Text>
         </View>
 
         {/* Food Preferences */}
         {(state.userProfile?.favoriteCuisine || state.userProfile?.favoriteFood) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🍽️ Food Preferences</Text>
-            <View style={styles.preferencesCard}>
+            <Text style={styles.sectionTitle}>PREFERENCES</Text>
+            <View style={styles.preferencesContainer}>
               {state.userProfile?.favoriteCuisine && (
-                <View style={styles.preferenceRow}>
-                  <Text style={styles.preferenceLabel}>Favorite Cuisine:</Text>
-                  <Text style={styles.preferenceValue}>{state.userProfile.favoriteCuisine}</Text>
+                <View style={styles.preferenceChip}>
+                  <Text style={styles.preferenceChipEmoji}>🍳</Text>
+                  <Text style={styles.preferenceChipText}>{state.userProfile.favoriteCuisine}</Text>
                 </View>
               )}
               {state.userProfile?.favoriteFood && (
-                <View style={styles.preferenceRow}>
-                  <Text style={styles.preferenceLabel}>Favorite Food:</Text>
-                  <Text style={styles.preferenceValue}>{state.userProfile.favoriteFood}</Text>
+                <View style={styles.preferenceChip}>
+                  <Text style={styles.preferenceChipEmoji}>🍽️</Text>
+                  <Text style={styles.preferenceChipText}>{state.userProfile.favoriteFood}</Text>
                 </View>
               )}
             </View>
@@ -116,7 +129,7 @@ export function ProfileScreen({ navigation }: Props) {
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📍 Location</Text>
+          <Text style={styles.sectionTitle}>LOCATION</Text>
           <View style={styles.locationCard}>
             {state.location?.address ? (
               <>
@@ -158,96 +171,99 @@ export function ProfileScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF8F3'
+    backgroundColor: tokens.colors.background
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.xxxl
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 40
+    marginBottom: tokens.spacing.xxxl
+  },
+  profileLogo: {
+    width: 60,
+    height: 60,
+    marginBottom: tokens.spacing.lg
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FF6A2A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4
+    marginBottom: tokens.spacing.lg,
+    ...tokens.shadows.lg
   },
   avatarText: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#FFFFFF'
+    color: tokens.colors.textInverse
   },
   name: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
-    color: '#161616'
+    letterSpacing: -0.5,
+    color: tokens.colors.textPrimary
   },
   section: {
-    marginBottom: 32
+    marginBottom: tokens.spacing.xxxl
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#161616',
-    marginBottom: 12
+    ...tokens.typography.label,
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.lg
   },
   locationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
     borderWidth: 1,
-    borderColor: '#F0F0F0'
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
   },
   locationAddress: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#161616',
-    marginBottom: 4
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm
   },
   coordinatesText: {
     fontSize: 12,
-    color: '#999',
+    color: tokens.colors.textTertiary,
     fontWeight: '500'
   },
   noLocationText: {
     fontSize: 14,
-    color: '#999',
+    color: tokens.colors.textTertiary,
     fontStyle: 'italic'
   },
-  preferencesCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F0F0F0'
-  },
-  preferenceRow: {
-    marginBottom: 12,
+  preferencesContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    flexWrap: 'wrap',
+    gap: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg
   },
-  preferenceLabel: {
+  preferenceChip: {
+    backgroundColor: tokens.colors.primaryTint,
+    borderRadius: tokens.radius.md,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.sm
+  },
+  preferenceChipEmoji: {
+    fontSize: 16
+  },
+  preferenceChipText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B6B6B'
-  },
-  preferenceValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FF6A2A'
+    color: tokens.colors.primary
   }
 });

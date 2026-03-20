@@ -5,13 +5,15 @@ import {
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { tokens } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'SplashCraving'>;
 
@@ -63,7 +65,11 @@ export function SplashCravingScreen({ navigation }: Props) {
     >
       <ScreenContainer>
         <View style={styles.header}>
-          <Text style={styles.logo}>CRAVR</Text>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Start with your craving.</Text>
         </View>
 
@@ -95,43 +101,43 @@ export function SplashCravingScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   header: {
-    marginBottom: 40
+    marginBottom: tokens.spacing.xxxl,
+    alignItems: 'center'
   },
-  logo: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FF6A2A',
-    letterSpacing: 1
+  logoImage: {
+    width: 80,
+    height: 80,
+    marginBottom: tokens.spacing.lg
   },
   tagline: {
-    marginTop: 8,
     fontSize: 16,
-    color: '#6B6B6B'
+    fontWeight: '600',
+    color: tokens.colors.textSecondary,
+    textAlign: 'center'
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.xl,
+    padding: tokens.spacing.xl,
+    borderWidth: 1,
+    borderColor: tokens.colors.border,
+    ...tokens.shadows.md
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
-    color: '#161616'
+    marginBottom: tokens.spacing.md,
+    color: tokens.colors.textPrimary
   },
   input: {
-    borderRadius: 18,
+    borderRadius: tokens.radius.lg,
     borderWidth: 1,
-    borderColor: '#FFE0CF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: tokens.colors.border,
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
     fontSize: 16,
-    backgroundColor: '#FFF8F3'
+    backgroundColor: tokens.colors.background,
+    color: tokens.colors.textPrimary
   },
   footer: {
     marginTop: 'auto'
