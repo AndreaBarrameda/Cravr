@@ -8,12 +8,12 @@ import {
   Platform
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SplashCraving'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'SplashCraving'>;
 
 export function SplashCravingScreen({ navigation }: Props) {
   const [text, setText] = useState('');

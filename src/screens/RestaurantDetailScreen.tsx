@@ -9,12 +9,12 @@ import {
   TouchableOpacity
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { api } from '../api/client';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDetail'>;
 
 type Dish = {
   dish_id: string;

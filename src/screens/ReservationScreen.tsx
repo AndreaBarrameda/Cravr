@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Reservation'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'Reservation'>;
 
 export function ReservationScreen({ route, navigation }: Props) {
   const { restaurantId, dishId, diningMode, matchId } = route.params;

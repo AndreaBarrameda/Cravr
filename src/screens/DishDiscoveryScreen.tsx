@@ -11,12 +11,12 @@ import {
   FlatList
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'DishDiscovery'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'DishDiscovery'>;
 
 type RestaurantResult = {
   dish_id: string;

@@ -9,12 +9,12 @@ import {
   Image
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RestaurantDiscovery'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDiscovery'>;
 
 type RestaurantCard = {
   restaurant_id: string;

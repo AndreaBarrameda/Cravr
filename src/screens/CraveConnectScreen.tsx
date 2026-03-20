@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CraveConnect'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'CraveConnect'>;
 
 type Card = {
   candidate_user_id: string;

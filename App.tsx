@@ -31,12 +31,8 @@ export type TabParamList = {
   Profile: undefined;
 };
 
-export type RootStackParamList = {
-  Login: undefined;
-  SignUp: undefined;
-  MainTabs: undefined;
-  OnboardingWelcome: undefined;
-  OnboardingProfile: undefined;
+export type DiscoverStackParamList = {
+  DiscoverHome: undefined;
   SplashCraving: undefined;
   CuisineSelection: { cravingId: string };
   RestaurantDiscovery: { cravingId: string; cravingText?: string; cuisine: string };
@@ -62,8 +58,76 @@ export type RootStackParamList = {
   Confirmation: { reservationId: string };
 };
 
+export type RootStackParamList = {
+  Login: undefined;
+  SignUp: undefined;
+  MainTabs: undefined;
+  OnboardingWelcome: undefined;
+  OnboardingProfile: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
+const DiscoverStack = createNativeStackNavigator<DiscoverStackParamList>();
+
+function DiscoverStackNavigator() {
+  return (
+    <DiscoverStack.Navigator
+      screenOptions={{
+        headerShown: false
+      }}
+    >
+      <DiscoverStack.Screen
+        name="DiscoverHome"
+        component={DiscoverScreen}
+      />
+      <DiscoverStack.Screen
+        name="SplashCraving"
+        component={SplashCravingScreen}
+      />
+      <DiscoverStack.Screen
+        name="CuisineSelection"
+        component={CuisineSelectionScreen}
+      />
+      <DiscoverStack.Screen
+        name="RestaurantDiscovery"
+        component={RestaurantDiscoveryScreen}
+      />
+      <DiscoverStack.Screen
+        name="RestaurantDetail"
+        component={RestaurantDetailScreen}
+      />
+      <DiscoverStack.Screen
+        name="DishDiscovery"
+        component={DishDiscoveryScreen}
+      />
+      <DiscoverStack.Screen
+        name="SoloCheck"
+        component={SoloCheckScreen}
+      />
+      <DiscoverStack.Screen
+        name="CraveConnect"
+        component={CraveConnectScreen}
+      />
+      <DiscoverStack.Screen
+        name="MatchSuccess"
+        component={MatchSuccessScreen}
+      />
+      <DiscoverStack.Screen
+        name="Chat"
+        component={ChatScreen}
+      />
+      <DiscoverStack.Screen
+        name="Reservation"
+        component={ReservationScreen}
+      />
+      <DiscoverStack.Screen
+        name="Confirmation"
+        component={ConfirmationScreen}
+      />
+    </DiscoverStack.Navigator>
+  );
+}
 
 function MainTabs() {
   return (
@@ -95,7 +159,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Discover"
-        component={DiscoverScreen}
+        component={DiscoverStackNavigator}
         options={{
           tabBarLabel: 'Discover',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 24, color }}>🔍</Text>

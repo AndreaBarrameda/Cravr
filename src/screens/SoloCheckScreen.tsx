@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'SoloCheck'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'SoloCheck'>;
 
 export function SoloCheckScreen({ route, navigation }: Props) {
   const { restaurantId, dishId, cravingId, cuisine } = route.params;

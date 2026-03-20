@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CuisineSelection'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'CuisineSelection'>;
 
 const FALLBACK_CUISINES = [
   { slug: 'oriental', name: 'Oriental' },

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { api } from '../api/client';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Confirmation'>;
+type Props = NativeStackScreenProps<DiscoverStackParamList, 'Confirmation'>;
 
 export function ConfirmationScreen({ route, navigation }: Props) {
   const { reservationId } = route.params;
