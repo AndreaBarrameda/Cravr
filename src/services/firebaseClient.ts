@@ -6,7 +6,18 @@ import {
   signOut,
   updateProfile
 } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  getDocs,
+  Timestamp
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBwya5WbMTimKS2iTkuRLa_Icd6Apnp9m8',
@@ -125,5 +136,132 @@ export async function loadUserPreferences(userId: string) {
     // eslint-disable-next-line no-console
     console.error('Failed to load preferences:', error);
     return { preferences: null, error: error.message || 'Failed to load preferences' };
+  }
+}
+
+// Bio management
+export async function updateUserBio(userId: string, bio: string) {
+  try {
+    await setDoc(
+      doc(db, 'users', userId),
+      { bio, updatedAt: Timestamp.now() },
+      { merge: true }
+    );
+    return { error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to update bio:', error);
+    return { error: error.message || 'Failed to update bio' };
+  }
+}
+
+export async function getUserProfile(userId: string) {
+  try {
+    const docSnap = await getDoc(doc(db, 'users', userId));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return {
+        profile: {
+          name: data.displayName,
+          bio: data.bio || ''
+        },
+        error: null
+      };
+    }
+    return { profile: null, error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load user profile:', error);
+    return { profile: null, error: error.message || 'Failed to load profile' };
+  }
+}
+
+// Post types and functions
+export type FoodPost = {
+  text: string;
+  emoji: string;
+  restaurantName?: string;
+  restaurantId?: string;
+  createdAt?: Timestamp;
+  userId: string;
+};
+
+export async function createPost(userId: string, post: Omit<FoodPost, 'userId' | 'createdAt'>) {
+  try {
+    const postData: FoodPost = {
+      ...post,
+      userId,
+      createdAt: Timestamp.now()
+    };
+    const docRef = await addDoc(collection(db, 'users', userId, 'posts'), postData);
+    return { postId: docRef.id, error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to create post:', error);
+    return { postId: null, error: error.message || 'Failed to create post' };
+  }
+}
+
+export async function getUserPosts(userId: string) {
+  try {
+    const q = query(
+      collection(db, 'users', userId, 'posts'),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    const posts = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    } as FoodPost & { id: string }));
+    return { posts, error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load posts:', error);
+    return { posts: [], error: error.message || 'Failed to load posts' };
+  }
+}
+
+// Review types and functions
+export type FoodReview = {
+  restaurantName: string;
+  restaurantId?: string;
+  rating: number;
+  text: string;
+  createdAt?: Timestamp;
+  userId: string;
+};
+
+export async function createReview(userId: string, review: Omit<FoodReview, 'userId' | 'createdAt'>) {
+  try {
+    const reviewData: FoodReview = {
+      ...review,
+      userId,
+      createdAt: Timestamp.now()
+    };
+    const docRef = await addDoc(collection(db, 'users', userId, 'reviews'), reviewData);
+    return { reviewId: docRef.id, error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to create review:', error);
+    return { reviewId: null, error: error.message || 'Failed to create review' };
+  }
+}
+
+export async function getUserReviews(userId: string) {
+  try {
+    const q = query(
+      collection(db, 'users', userId, 'reviews'),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    const reviews = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    } as FoodReview & { id: string }));
+    return { reviews, error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load reviews:', error);
+    return { reviews: [], error: error.message || 'Failed to load reviews' };
   }
 }

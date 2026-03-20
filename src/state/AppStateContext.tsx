@@ -28,11 +28,13 @@ type AppState = {
   preferences?: string[];
   userProfile?: {
     name: string;
+    bio?: string;
     favoriteCuisine?: string;
     favoriteFood?: string;
   };
   isAuthenticated?: boolean;
   authUser?: AuthUser;
+  darkMode?: boolean;
 };
 
 type AppStateContextValue = {
