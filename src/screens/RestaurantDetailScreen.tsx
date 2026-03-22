@@ -141,13 +141,14 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>📍 Location</Text>
-                <View style={styles.infoValueColumn}>
-                  <Text style={styles.infoValue}>{restaurantData.address}</Text>
-                  {distanceKm !== null && (
-                    <Text style={styles.distanceValue}>📌 {formatDistance(distanceKm)} away</Text>
-                  )}
-                </View>
+                <Text style={styles.infoValue}>{restaurantData.address}</Text>
               </View>
+              {distanceKm !== null && (
+                <View style={[styles.infoRow, { marginTop: 12 }]}>
+                  <Text style={styles.infoLabel}>📌 Distance</Text>
+                  <Text style={styles.distanceValue}>{formatDistance(distanceKm)} away</Text>
+                </View>
+              )}
               <View style={[styles.infoRow, { marginTop: 12 }]}>
                 <Text style={styles.infoLabel}>📞 Phone</Text>
                 <Text style={styles.infoValue}>{restaurantData.phone}</Text>
@@ -256,15 +257,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     lineHeight: 20
   },
-  infoValueColumn: {
-    flex: 1,
-    marginLeft: 12
-  },
   distanceValue: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#FF6A2A',
     fontWeight: '600',
-    marginTop: 4
+    flex: 1,
+    marginLeft: 12,
+    lineHeight: 20
   },
   menuSection: {
     marginBottom: 20
