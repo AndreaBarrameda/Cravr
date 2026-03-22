@@ -56,6 +56,14 @@ export function SettingsMenu({
     setLocationSearchVisible(false);
   };
 
+  const handleUseCurrentLocation = () => {
+    setState((prev) => ({
+      ...prev,
+      searchLocation: undefined
+    }));
+    Alert.alert('Location Reset', 'Now using your current location');
+  };
+
   const handleUpdateLocation = async () => {
     try {
       setUpdatingLocation(true);
@@ -184,6 +192,21 @@ export function SettingsMenu({
                 </View>
               </View>
             </TouchableOpacity>
+
+            {/* Use Current Location - Only show if searchLocation is set */}
+            {state.searchLocation && (
+              <TouchableOpacity
+                style={[styles.menuItem, { borderBottomColor: isDark ? '#2A2A2A' : tokens.colors.border }]}
+                onPress={handleUseCurrentLocation}
+              >
+                <View style={styles.menuItemLeft}>
+                  <Text style={styles.menuItemIcon}>📍</Text>
+                  <Text style={[styles.menuItemText, { color: tokens.colors.primary }]}>
+                    Use Current Location
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Re-run Onboarding */}
             <TouchableOpacity
