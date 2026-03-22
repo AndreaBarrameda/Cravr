@@ -7,10 +7,18 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "react-native"
   },
   "include": [
     "src"
   ],
-  "extends": "expo/tsconfig.base"
+  "exclude": [
+    "src/screens/**",
+    "src/components/**",
+    "src/state/**",
+    "src/api/**",
+    "src/theme/**",
+    "src/utils/**"
+  ]
 }
