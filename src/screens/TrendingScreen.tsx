@@ -95,48 +95,45 @@ export function TrendingScreen({ navigation }: Props) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [liveFeed, setLiveFeed] = useState<(FoodPost | FoodReview)[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<'newest' | 'garden' | 'city-view' | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'newest' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'all'>('newest');
+  const [error, setError] = useState<string | null>(null);
 
-  // Load trending restaurants and data
+  // Load trending restaurants based on selected category
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
         const searchLoc = state.searchLocation || state.location;
         const location = searchLoc
           ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
           : { lat: 10.3157, lng: 123.8854 };
 
-        // Fetch Michelin Guide (fast, no timeout needed)
-        const michelinData = await api.getMichelinGuide();
-        // eslint-disable-next-line no-console
-        console.log('🏆 Michelin data loaded:', michelinData.total, 'restaurants');
-        setMichelinGuide(michelinData);
+        // Fetch Michelin Guide
+        try {
+          const michelinData = await api.getMichelinGuide();
+          setMichelinGuide(michelinData);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('Failed to load Michelin guide:', e);
+        }
 
-        // Create a timeout promise for trending (15 seconds)
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), 15000)
-        );
-
-        const data = await Promise.race([
-          api.getTrendingRestaurants({
-            lat: location.lat,
-            lng: location.lng,
-            limit: 15
-          }),
-          timeoutPromise
-        ]);
+        // Fetch trending restaurants for selected category
+        const data = await api.getTrendingRestaurants({
+          lat: location.lat,
+          lng: location.lng,
+          limit: 15,
+          category: selectedCategory as any
+        });
 
         // eslint-disable-next-line no-console
-        console.log('🔥 Trending data loaded:', data.results?.length, 'restaurants');
-
+        console.log(`🔥 Loaded ${data.results?.length || 0} restaurants for category: ${selectedCategory}`);
         setAllRestaurants(data.results?.slice(0, 15) || []);
       } catch (e) {
+        const errorMsg = (e as any)?.message || String(e);
         // eslint-disable-next-line no-console
-        console.error('🔥 Failed to fetch trending data:', e);
-        // eslint-disable-next-line no-console
-        console.error('Error details:', (e as any)?.message);
-        // Show empty state instead of error
+        console.error('🔥 Failed to fetch trending data:', errorMsg);
+        setError(errorMsg);
         setAllRestaurants([]);
       } finally {
         setLoading(false);
@@ -144,7 +141,7 @@ export function TrendingScreen({ navigation }: Props) {
     };
 
     fetchData();
-  }, [state.location, state.searchLocation]);
+  }, [state.location, state.searchLocation, selectedCategory]);
 
   // Load live feed (posts and reviews from all users)
   useFocusEffect(
@@ -245,31 +242,12 @@ export function TrendingScreen({ navigation }: Props) {
     }, [])
   );
 
-  // Filter restaurants based on selected category
-  const filterRestaurantsByCategory = (restaurants: TrendingRestaurant[]) => {
-    if (selectedCategory === 'all') return restaurants;
-    if (selectedCategory === 'newest') return restaurants.slice(0, 8); // Assume first results are newest
-    if (selectedCategory === 'garden') {
-      const filtered = restaurants.filter((r) =>
-        r.vibe_tags?.some((tag) => tag.toLowerCase().includes('garden') || tag.toLowerCase().includes('outdoor'))
-      );
-      return filtered.length > 0 ? filtered : restaurants; // Show all if no garden matches
-    }
-    if (selectedCategory === 'city-view') {
-      const filtered = restaurants.filter((r) =>
-        r.vibe_tags?.some((tag) => tag.toLowerCase().includes('view') || tag.toLowerCase().includes('city') || tag.toLowerCase().includes('rooftop'))
-      );
-      return filtered.length > 0 ? filtered : restaurants; // Show all if no view matches
-    }
-    return restaurants;
-  };
-
   // Organize restaurants by category
   const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
   const topRatedRestaurants = [...allRestaurants]
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 5);
-  const trendingRestaurants = filterRestaurantsByCategory(allRestaurants).slice(0, 8);
+  const trendingRestaurants = allRestaurants.slice(0, 8);
 
   const renderCarouselCard = ({ item }: { item: TrendingRestaurant }) => (
     <TouchableOpacity
@@ -381,7 +359,7 @@ export function TrendingScreen({ navigation }: Props) {
         </View>
 
         {/* Category Filters */}
-        <View style={styles.categoryContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryContainer}>
           <TouchableOpacity
             style={[styles.categoryPill, selectedCategory === 'newest' && styles.categoryPillActive]}
             onPress={() => setSelectedCategory('newest')}
@@ -407,6 +385,22 @@ export function TrendingScreen({ navigation }: Props) {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'cozy-cafes' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('cozy-cafes')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'cozy-cafes' && styles.categoryLabelActive]}>
+              ☕ Cozy Cafes
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'fine-dining' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('fine-dining')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'fine-dining' && styles.categoryLabelActive]}>
+              🍽️ Fine Dining
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.categoryPill, selectedCategory === 'all' && styles.categoryPillActive]}
             onPress={() => setSelectedCategory('all')}
           >
@@ -414,7 +408,7 @@ export function TrendingScreen({ navigation }: Props) {
               All
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* Weather Widget */}
         <WeatherWidget />
@@ -503,7 +497,7 @@ export function TrendingScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Michelin Restaurants Section */}
+        {/* Michelin Restaurants Section - Only show for 'all' category */}
         {selectedCategory === 'all' && michelinRestaurants.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>MICHELIN HONORED</Text>
@@ -515,11 +509,11 @@ export function TrendingScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Top Rated Section */}
+        {/* Top Rated Section - Only show for 'all' category */}
         {selectedCategory === 'all' && topRatedRestaurants.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>TOP RATED</Text>
-            {topRatedRestaurants.map((restaurant, idx) => (
+            {topRatedRestaurants.map((restaurant) => (
               <View key={restaurant.restaurant_id}>
                 {renderSmallCard({ item: restaurant })}
               </View>
@@ -528,18 +522,36 @@ export function TrendingScreen({ navigation }: Props) {
         )}
 
         {/* Category Results Section */}
-        {selectedCategory !== 'all' && trendingRestaurants.length > 0 && (
+        {trendingRestaurants.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {selectedCategory === 'newest' && '✨ NEWEST'}
-              {selectedCategory === 'garden' && '🌿 GARDEN SETTING'}
-              {selectedCategory === 'city-view' && '🏙️ CITY VIEWS'}
+              {selectedCategory === 'newest' && '✨ TRENDING & NEWEST'}
+              {selectedCategory === 'garden' && '🌿 GARDEN RESTAURANTS'}
+              {selectedCategory === 'city-view' && '🏙️ ROOFTOP & CITY VIEWS'}
+              {selectedCategory === 'cozy-cafes' && '☕ COZY & INTIMATE CAFES'}
+              {selectedCategory === 'fine-dining' && '🍽️ FINE DINING'}
+              {selectedCategory === 'all' && '🔥 TRENDING NOW'}
             </Text>
             {trendingRestaurants.map((restaurant) => (
               <View key={restaurant.restaurant_id}>
                 {renderSmallCard({ item: restaurant })}
               </View>
             ))}
+          </View>
+        )}
+
+        {/* Loading or Empty State */}
+        {!loading && trendingRestaurants.length === 0 && (
+          <View style={styles.section}>
+            <View style={styles.emptyFeedContainer}>
+              <Text style={styles.emptyFeedEmoji}>🍽️</Text>
+              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>
+                No restaurants found
+              </Text>
+              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
+                Try a different category
+              </Text>
+            </View>
           </View>
         )}
 
@@ -604,7 +616,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: tokens.spacing.xl,
     marginBottom: tokens.spacing.xl,
-    gap: tokens.spacing.sm
+    gap: tokens.spacing.sm,
+    paddingBottom: tokens.spacing.md
   },
   categoryPill: {
     paddingHorizontal: tokens.spacing.md,

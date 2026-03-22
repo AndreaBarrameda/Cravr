@@ -63,12 +63,14 @@ export const api = {
     lat: number;
     lng: number;
     limit?: number;
+    category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest';
   }) {
     return request('/discovery/trending', {
       method: 'POST',
       body: JSON.stringify({
         location: { lat: params.lat, lng: params.lng },
-        limit: params.limit || 10
+        limit: params.limit || 10,
+        category: params.category || 'all'
       })
     });
   },
