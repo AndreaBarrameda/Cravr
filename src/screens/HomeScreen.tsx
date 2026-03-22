@@ -40,10 +40,11 @@ export function HomeScreen({ navigation }: Props) {
       const time = getTimeOfDay();
       setTimeOfDay(time);
 
-      if (state.location) {
+      const searchLoc = state.searchLocation || state.location;
+      if (searchLoc) {
         const weatherData = await getWeatherData(
-          state.location.latitude,
-          state.location.longitude
+          searchLoc.latitude,
+          searchLoc.longitude
         );
         setWeather(weatherData);
 
@@ -53,14 +54,15 @@ export function HomeScreen({ navigation }: Props) {
     };
 
     initializeContext();
-  }, [state.location]);
+  }, [state.location, state.searchLocation]);
 
   const onSubmit = async () => {
     if (!text.trim()) return;
     try {
       setLoading(true);
-      const location = state.location
-        ? { lat: state.location.latitude, lng: state.location.longitude }
+      const searchLoc = state.searchLocation || state.location;
+      const location = searchLoc
+        ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
         : undefined;
 
       const result = await api.resolveCraving(text.trim(), location);

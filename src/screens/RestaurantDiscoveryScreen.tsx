@@ -41,9 +41,10 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Use device location from app state, fallback to Cebu for testing
-        const lat = state.location?.latitude ?? 10.3157;
-        const lng = state.location?.longitude ?? 123.8854;
+        // Use search location if set, otherwise use device location, fallback to Cebu for testing
+        const searchLoc = state.searchLocation || state.location;
+        const lat = searchLoc?.latitude ?? 10.3157;
+        const lng = searchLoc?.longitude ?? 123.8854;
 
         // Get time and weather context
         const time = getTimeOfDay();
@@ -80,7 +81,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
       }
     };
     fetchData();
-  }, [cravingId, cuisine, state.location]);
+  }, [cravingId, cuisine, state.location, state.searchLocation]);
 
   const onSelect = (restaurantId: string) => {
     setState((prev) => ({ ...prev, selectedRestaurantId: restaurantId }));

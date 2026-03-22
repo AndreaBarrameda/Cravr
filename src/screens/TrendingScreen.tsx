@@ -101,8 +101,9 @@ export function TrendingScreen({ navigation }: Props) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const location = state.location
-          ? { lat: state.location.latitude, lng: state.location.longitude }
+        const searchLoc = state.searchLocation || state.location;
+        const location = searchLoc
+          ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
           : { lat: 10.3157, lng: 123.8854 };
 
         // Fetch Michelin Guide (fast, no timeout needed)
@@ -140,7 +141,7 @@ export function TrendingScreen({ navigation }: Props) {
     };
 
     fetchData();
-  }, [state.location]);
+  }, [state.location, state.searchLocation]);
 
   // Load live feed (posts and reviews from all users)
   useFocusEffect(
