@@ -113,9 +113,9 @@ export function TrendingScreen({ navigation }: Props) {
         console.log('🏆 Michelin data loaded:', michelinData.total, 'restaurants');
         setMichelinGuide(michelinData);
 
-        // Create a timeout promise for trending (5 seconds)
+        // Create a timeout promise for trending (15 seconds)
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), 5000)
+          setTimeout(() => reject(new Error('Request timeout')), 15000)
         );
 
         const data = await Promise.race([
@@ -133,7 +133,9 @@ export function TrendingScreen({ navigation }: Props) {
         setAllRestaurants(data.results?.slice(0, 15) || []);
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error('Failed to fetch data:', e);
+        console.error('🔥 Failed to fetch trending data:', e);
+        // eslint-disable-next-line no-console
+        console.error('Error details:', (e as any)?.message);
         // Show empty state instead of error
         setAllRestaurants([]);
       } finally {
