@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 import { tokens } from '../theme/tokens';
+import { getTimeOfDay, getWeatherData, getFoodSuggestions, type WeatherData } from '../utils/contextual';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Home'>,
@@ -28,6 +29,30 @@ export function HomeScreen({ navigation }: Props) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const { state, setState } = useAppState();
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [timeOfDay, setTimeOfDay] = useState<string>('');
+  const [contextualSuggestions, setContextualSuggestions] = useState<string[]>([]);
+
+  // Fetch weather and time on mount
+  useEffect(() => {
+    const initializeContext = async () => {
+      const time = getTimeOfDay();
+      setTimeOfDay(time);
+
+      if (state.location) {
+        const weatherData = await getWeatherData(
+          state.location.latitude,
+          state.location.longitude
+        );
+        setWeather(weatherData);
+
+        const suggestions = getFoodSuggestions(time, weatherData);
+        setContextualSuggestions(suggestions);
+      }
+    };
+
+    initializeContext();
+  }, [state.location]);
 
   const onSubmit = async () => {
     if (!text.trim()) return;
@@ -101,10 +126,29 @@ export function HomeScreen({ navigation }: Props) {
           </Text>
         </View>
 
+        {/* Weather & Time Context */}
+        {weather && (
+          <View style={styles.contextCard}>
+            <Text style={styles.contextEmoji}>
+              {weather.condition === 'rainy' ? '🌧️' : weather.temperature > 28 ? '☀️' : '🌤️'}
+            </Text>
+            <View style={styles.contextText}>
+              <Text style={styles.contextTime}>
+                {timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}
+              </Text>
+              <Text style={styles.contextWeather}>{weather.description}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <Text style={styles.mainHeading}>What are you craving?</Text>
-          <Text style={styles.subtitle}>Discover new favorites near you</Text>
+          <Text style={styles.subtitle}>
+            {contextualSuggestions.length > 0
+              ? `Try ${contextualSuggestions.slice(0, 3).join(', ')}...`
+              : 'Discover new favorites near you'}
+          </Text>
         </View>
 
         {/* Search Input */}
@@ -262,6 +306,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: tokens.colors.accentGreen,
     fontWeight: '600'
+  },
+  // Context Card (Weather & Time)
+  contextCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: tokens.colors.primaryTint,
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.xl,
+    gap: tokens.spacing.md
+  },
+  contextEmoji: {
+    fontSize: 32
+  },
+  contextText: {
+    flex: 1
+  },
+  contextTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: tokens.colors.primary,
+    marginBottom: 2
+  },
+  contextWeather: {
+    fontSize: 12,
+    color: tokens.colors.textSecondary,
+    fontWeight: '400'
   },
   // Hero Section
   heroSection: {
