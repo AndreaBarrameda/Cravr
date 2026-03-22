@@ -114,13 +114,7 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Minimalist Header */}
-        <View style={styles.headerTopContainer}>
-          <TouchableOpacity style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </TouchableOpacity>
-        </View>
-
+        {/* Header */}
         <View style={styles.headerTop}>
           <Text style={styles.greeting}>
             Welcome back,{'\n'}{state.userProfile?.name?.split(' ')[0] || 'Andrea'}
@@ -228,11 +222,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100 // Space for footer
   },
   // Header Section
-  headerTopContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingBottom: tokens.spacing.lg
-  },
   headerTop: {
     marginBottom: tokens.spacing.xl,
     alignItems: 'center',
@@ -258,19 +247,6 @@ const styles = StyleSheet.create({
     color: tokens.colors.textSecondary,
     marginTop: tokens.spacing.xs,
     display: 'none'
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: tokens.colors.backgroundLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: tokens.colors.border
-  },
-  avatarText: {
-    fontSize: 20
   },
   locationPill: {
     display: 'none'
