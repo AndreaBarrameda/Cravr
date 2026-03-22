@@ -40,6 +40,8 @@ export const api = {
     cuisine: string;
     lat: number;
     lng: number;
+    timeOfDay?: string;
+    weather?: { temperature: number; condition: string };
   }) {
     return request('/discovery/restaurants', {
       method: 'POST',
@@ -48,7 +50,11 @@ export const api = {
         craving_text: params.craving_text,
         cuisine: params.cuisine,
         location: { lat: params.lat, lng: params.lng },
-        radius_meters: 3000
+        radius_meters: 3000,
+        context: {
+          timeOfDay: params.timeOfDay,
+          weather: params.weather
+        }
       })
     });
   },

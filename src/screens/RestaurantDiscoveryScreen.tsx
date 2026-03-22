@@ -13,6 +13,7 @@ import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { getTimeOfDay, getWeatherData } from '../utils/contextual';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDiscovery'>;
 
@@ -40,17 +41,25 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
         const lat = state.location?.latitude ?? 10.3157;
         const lng = state.location?.longitude ?? 123.8854;
 
+        // Get time and weather context
+        const timeOfDay = getTimeOfDay();
+        const weatherData = await getWeatherData(lat, lng);
+
         // eslint-disable-next-line no-console
         console.log('🍽️ Restaurant discovery location:', { lat, lng });
         // eslint-disable-next-line no-console
-        console.log('📍 Full app location state:', state.location);
+        console.log('⏰ Time of day:', timeOfDay);
+        // eslint-disable-next-line no-console
+        console.log('🌤️ Weather:', weatherData);
 
         const data = await api.discoverRestaurants({
           craving_id: cravingId,
           craving_text: cravingText,
           cuisine,
           lat,
-          lng
+          lng,
+          timeOfDay,
+          weather: weatherData || undefined
         });
         // eslint-disable-next-line no-console
         console.log('🍽️ API Response:', data);
