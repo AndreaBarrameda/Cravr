@@ -13,6 +13,7 @@ import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer, CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { api } from '../api/client';
+import { calculateHaversineDistance, formatDistance } from '../utils/distance';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDetail'>;
 
@@ -36,6 +37,8 @@ type RestaurantData = {
   hours: string;
   distance_meters: number;
   vibe_tags: string[];
+  latitude?: number;
+  longitude?: number;
 };
 
 export function RestaurantDetailScreen({ route, navigation }: Props) {
@@ -44,6 +47,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,6 +62,11 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         api.getRestaurantDetails(placeId).then((detailsData) => {
           if (detailsData) {
             setRestaurantData(detailsData);
+            // Calculate distance if we have coordinates
+            if (detailsData.latitude && detailsData.longitude) {
+              const distance = calculateHaversineDistance(lat, lng, detailsData.latitude, detailsData.longitude);
+              setDistanceKm(distance);
+            }
           }
         }).catch(() => {
           // Silently fail - details are optional
@@ -132,7 +141,12 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>📍 Location</Text>
-                <Text style={styles.infoValue}>{restaurantData.address}</Text>
+                <View style={styles.infoValueColumn}>
+                  <Text style={styles.infoValue}>{restaurantData.address}</Text>
+                  {distanceKm !== null && (
+                    <Text style={styles.distanceValue}>📌 {formatDistance(distanceKm)} away</Text>
+                  )}
+                </View>
               </View>
               <View style={[styles.infoRow, { marginTop: 12 }]}>
                 <Text style={styles.infoLabel}>📞 Phone</Text>
@@ -156,52 +170,6 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* Menu Items - render immediately, don't block on restaurant data */}
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Recommended Dishes</Text>
-
-          {dishes.length > 0 ? (
-            dishes.map((dish) => (
-              <TouchableOpacity
-                key={dish.dish_id}
-                style={[
-                  styles.dishCard,
-                  selectedDish?.dish_id === dish.dish_id && styles.dishCardSelected
-                ]}
-                onPress={() => setSelectedDish(dish)}
-              >
-                {dish.photo_url && (
-                  <Image
-                    source={{ uri: dish.photo_url }}
-                    style={styles.dishImage}
-                  />
-                )}
-                <View style={styles.dishInfo}>
-                  <View style={styles.dishHeader}>
-                    <Text style={styles.dishName}>{dish.name}</Text>
-                    <Text style={styles.dishPrice}>
-                      ₱{dish.price.toFixed(0)}
-                    </Text>
-                  </View>
-                  <Text style={styles.dishDescription} numberOfLines={2}>
-                    {dish.description}
-                  </Text>
-                  <View style={styles.matchScore}>
-                    <Text style={styles.matchScoreText}>
-                      ✨ {Math.round(dish.match_score * 100)}% match
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>
-                No recommended dishes available
-              </Text>
-            </View>
-          )}
-        </View>
 
         {/* Continue Button */}
         <View style={styles.footer}>
@@ -287,6 +255,16 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     lineHeight: 20
+  },
+  infoValueColumn: {
+    flex: 1,
+    marginLeft: 12
+  },
+  distanceValue: {
+    fontSize: 12,
+    color: '#FF6A2A',
+    fontWeight: '600',
+    marginTop: 4
   },
   menuSection: {
     marginBottom: 20
