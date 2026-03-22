@@ -436,10 +436,19 @@ export function DiscoverScreen({ navigation }: Props) {
               ) : hasMoreDishes && currentDish ? (
                 <>
                   <View style={styles.dishCard}>
-                    {currentDish.photo_url ? (
+                    {currentDish.photo_url && currentDish.photo_url.length > 0 ? (
                       <Image
                         source={{ uri: currentDish.photo_url }}
                         style={styles.dishImage}
+                        resizeMode="cover"
+                        onError={() => {
+                          // eslint-disable-next-line no-console
+                          console.warn('Failed to load image:', currentDish.photo_url);
+                        }}
+                        onLoad={() => {
+                          // eslint-disable-next-line no-console
+                          console.log('✅ Image loaded:', currentDish.photo_url);
+                        }}
                       />
                     ) : (
                       <View style={[styles.dishImage, { backgroundColor: tokens.colors.border }]} />
