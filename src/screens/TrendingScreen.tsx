@@ -25,6 +25,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, collectionGroup, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { tokens } from '../theme/tokens';
 import type { FoodPost, FoodReview } from '../services/firebaseClient';
+import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = NativeStackScreenProps<TrendingStackParamList, 'TrendingHome'>;
 
@@ -353,6 +354,9 @@ export function TrendingScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+
+        {/* Weather Widget */}
+        <WeatherWidget />
 
         {/* Michelin Guide Section */}
         {(michelinGuide.bib_gourmand.length > 0 || michelinGuide.michelin_selection.length > 0) && (

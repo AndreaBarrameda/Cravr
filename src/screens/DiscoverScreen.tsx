@@ -20,6 +20,7 @@ import { CravrButton } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 import { tokens } from '../theme/tokens';
+import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Discover'>,
@@ -175,6 +176,7 @@ export function DiscoverScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>Discover</Text>
+          <WeatherWidget />
 
           {/* Search input - editorial with emoji prefix */}
           <View style={styles.section}>

@@ -19,6 +19,7 @@ import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 import { tokens } from '../theme/tokens';
 import { getTimeOfDay, getWeatherData, getFoodSuggestions, type WeatherData } from '../utils/contextual';
+import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TabParamList, 'Home'>,
@@ -126,20 +127,8 @@ export function HomeScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        {/* Weather & Time Context */}
-        {weather && (
-          <View style={styles.contextCard}>
-            <Text style={styles.contextEmoji}>
-              {weather.condition === 'rainy' ? '🌧️' : weather.temperature > 28 ? '☀️' : '🌤️'}
-            </Text>
-            <View style={styles.contextText}>
-              <Text style={styles.contextTime}>
-                {timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}
-              </Text>
-              <Text style={styles.contextWeather}>{weather.description}</Text>
-            </View>
-          </View>
-        )}
+        {/* Weather & Time Widget */}
+        <WeatherWidget />
 
         {/* Hero Section */}
         <View style={styles.heroSection}>
@@ -306,33 +295,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: tokens.colors.accentGreen,
     fontWeight: '600'
-  },
-  // Context Card (Weather & Time)
-  contextCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: tokens.colors.primaryTint,
-    borderRadius: tokens.radius.lg,
-    padding: tokens.spacing.lg,
-    marginBottom: tokens.spacing.xl,
-    gap: tokens.spacing.md
-  },
-  contextEmoji: {
-    fontSize: 32
-  },
-  contextText: {
-    flex: 1
-  },
-  contextTime: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: tokens.colors.primary,
-    marginBottom: 2
-  },
-  contextWeather: {
-    fontSize: 12,
-    color: tokens.colors.textSecondary,
-    fontWeight: '400'
   },
   // Hero Section
   heroSection: {
