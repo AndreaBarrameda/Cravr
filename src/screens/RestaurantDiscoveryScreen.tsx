@@ -14,6 +14,8 @@ import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
 import { getTimeOfDay, getWeatherData } from '../utils/contextual';
+import { generateMatchExplanation } from '../utils/explanations';
+import { calculateHaversineDistance } from '../utils/distance';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDiscovery'>;
 
@@ -33,6 +35,8 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
   const { state, setState } = useAppState();
   const [loading, setLoading] = useState(true);
   const [restaurants, setRestaurants] = useState<RestaurantCard[]>([]);
+  const [weather, setWeather] = useState<any>(null);
+  const [timeOfDay, setTimeOfDay] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,13 +46,15 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
         const lng = state.location?.longitude ?? 123.8854;
 
         // Get time and weather context
-        const timeOfDay = getTimeOfDay();
+        const time = getTimeOfDay();
         const weatherData = await getWeatherData(lat, lng);
+        setTimeOfDay(time);
+        setWeather(weatherData);
 
         // eslint-disable-next-line no-console
         console.log('🍽️ Restaurant discovery location:', { lat, lng });
         // eslint-disable-next-line no-console
-        console.log('⏰ Time of day:', timeOfDay);
+        console.log('⏰ Time of day:', time);
         // eslint-disable-next-line no-console
         console.log('🌤️ Weather:', weatherData);
 
@@ -104,38 +110,54 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
         <FlatList
           data={restaurants}
           keyExtractor={(item) => item.restaurant_id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => onSelect(item.restaurant_id)}
-            >
-              {item.hero_photo_url && (
-                <Image
-                  source={{ uri: item.hero_photo_url }}
-                  style={styles.cardImage}
-                />
-              )}
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <Text style={styles.cardMeta}>
-                  {item.rating ? `${item.rating.toFixed(1)} ★` : 'New'} •{' '}
-                  {item.price_level ? `₱${item.average_price_pesos}` : '$'} • {item.distance_meters ? (item.distance_meters > 1000 ? `${(item.distance_meters / 1000).toFixed(1)}km` : `${item.distance_meters}m`) : '—'}
-                </Text>
-                {item.match_reason && (
-                  <Text style={styles.cardReason}>{item.match_reason}</Text>
+          renderItem={({ item }) => {
+            // Calculate distance in km and generate AI explanation
+            const distanceKm = item.distance_meters ? item.distance_meters / 1000 : 0;
+            const aiExplanation = generateMatchExplanation({
+              craving: cravingText || cuisine || 'food',
+              restaurantName: item.name,
+              timeOfDay,
+              weather,
+              distanceKm,
+              rating: item.rating || 0,
+              matchScore: 0.8
+            });
+
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => onSelect(item.restaurant_id)}
+              >
+                {item.hero_photo_url && (
+                  <Image
+                    source={{ uri: item.hero_photo_url }}
+                    style={styles.cardImage}
+                  />
                 )}
-                {item.vibe_tags?.length ? (
-                  <View style={styles.chipRow}>
-                    {item.vibe_tags.slice(0, 2).map((tag) => (
-                      <View key={tag} style={styles.chip}>
-                        <Text style={styles.chipText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          )}
+                <View style={styles.cardBody}>
+                  <Text style={styles.cardTitle}>{item.name}</Text>
+                  <Text style={styles.cardMeta}>
+                    {item.rating ? `${item.rating.toFixed(1)} ★` : 'New'} •{' '}
+                    {item.price_level ? `₱${item.average_price_pesos}` : '$'} • {item.distance_meters ? (item.distance_meters > 1000 ? `${(item.distance_meters / 1000).toFixed(1)}km` : `${item.distance_meters}m`) : '—'}
+                  </Text>
+                  {aiExplanation && (
+                    <Text style={styles.aiExplanation} numberOfLines={1}>
+                      ✨ {aiExplanation}
+                    </Text>
+                  )}
+                  {item.vibe_tags?.length ? (
+                    <View style={styles.chipRow}>
+                      {item.vibe_tags.slice(0, 2).map((tag) => (
+                        <View key={tag} style={styles.chip}>
+                          <Text style={styles.chipText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
           contentContainerStyle={styles.listContent}
         />
       )}
@@ -212,6 +234,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B6B6B',
     marginBottom: 8
+  },
+  aiExplanation: {
+    fontSize: 13,
+    color: '#FF6A2A',
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 2
   },
   cardReason: {
     fontSize: 13,

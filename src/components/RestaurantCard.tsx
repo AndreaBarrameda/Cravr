@@ -17,6 +17,7 @@ interface RestaurantCardProps {
   cuisine?: string;
   description?: string;
   onPress?: () => void;
+  aiExplanation?: string;
 }
 
 export function RestaurantCard({
@@ -27,7 +28,8 @@ export function RestaurantCard({
   price,
   cuisine = 'Mixed',
   description = '',
-  onPress
+  onPress,
+  aiExplanation
 }: RestaurantCardProps) {
   const priceLevel = '$ ' .repeat(Math.min(Math.ceil(price / 200), 3));
   const isOpen = true; // You can pass this as a prop if available
@@ -80,25 +82,12 @@ export function RestaurantCard({
           )}
         </View>
 
-        {/* Tags/Chips */}
-        <View style={styles.tagsContainer}>
-          {cuisine && cuisine !== 'Mixed' && (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>{cuisine}</Text>
-            </View>
-          )}
-          {matchReason && (
-            <View style={styles.tag}>
-              <Text style={styles.tagText} numberOfLines={1}>
-                {/* Extract meaningful keywords from match reason */}
-                {matchReason.includes('rated') ? 'Highly Rated' :
-                 matchReason.includes('favorite') ? 'Favorite' :
-                 matchReason.includes('gem') ? 'Hidden Gem' :
-                 'Popular'}
-              </Text>
-            </View>
-          )}
-        </View>
+        {/* AI Explanation - One line, orange */}
+        {aiExplanation && (
+          <Text style={styles.aiExplanation} numberOfLines={1}>
+            ✨ {aiExplanation}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -158,23 +147,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: tokens.colors.accentGreen
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    gap: tokens.spacing.md,
-    flexWrap: 'wrap',
-    marginTop: tokens.spacing.sm
-  },
-  tag: {
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.md,
-    borderWidth: 1,
-    borderColor: tokens.colors.border
-  },
-  tagText: {
-    fontSize: 12,
+  aiExplanation: {
+    fontSize: 13,
     fontWeight: '600',
-    color: tokens.colors.textSecondary
+    color: tokens.colors.primary,
+    marginTop: tokens.spacing.sm
   }
 });
