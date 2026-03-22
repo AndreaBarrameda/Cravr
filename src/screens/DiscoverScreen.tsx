@@ -436,23 +436,18 @@ export function DiscoverScreen({ navigation }: Props) {
               ) : hasMoreDishes && currentDish ? (
                 <>
                   <View style={styles.dishCard}>
-                    {currentDish.photo_url && currentDish.photo_url.length > 0 ? (
-                      <Image
-                        source={{ uri: currentDish.photo_url }}
-                        style={styles.dishImage}
-                        resizeMode="cover"
-                        onError={() => {
-                          // eslint-disable-next-line no-console
-                          console.warn('Failed to load image:', currentDish.photo_url);
-                        }}
-                        onLoad={() => {
-                          // eslint-disable-next-line no-console
-                          console.log('✅ Image loaded:', currentDish.photo_url);
-                        }}
-                      />
-                    ) : (
-                      <View style={[styles.dishImage, { backgroundColor: tokens.colors.border }]} />
-                    )}
+                    <View style={styles.dishImageContainer}>
+                      {currentDish.photo_url ? (
+                        <Image
+                          source={{ uri: currentDish.photo_url }}
+                          style={styles.dishImage}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+                      <View style={[styles.dishImage, styles.dishImagePlaceholder]}>
+                        <Text style={styles.dishImageEmoji}>🍽️</Text>
+                      </View>
+                    </View>
                     <View style={styles.dishInfo}>
                       <Text style={styles.dishName}>{currentDish.name}</Text>
                       <Text style={styles.dishRestaurant}>{currentDish.restaurant_name}</Text>
@@ -693,10 +688,30 @@ const styles = StyleSheet.create({
     ...tokens.shadows.lg,
     marginVertical: tokens.spacing.xl
   },
-  dishImage: {
+  dishImageContainer: {
     width: '100%',
     height: 280,
-    backgroundColor: tokens.colors.border
+    position: 'relative',
+    backgroundColor: tokens.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  dishImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%'
+  },
+  dishImagePlaceholder: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  dishImageEmoji: {
+    fontSize: 64,
+    opacity: 0.3
   },
   dishInfo: {
     padding: tokens.spacing.lg
