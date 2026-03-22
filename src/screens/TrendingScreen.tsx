@@ -338,6 +338,24 @@ export function TrendingScreen({ navigation }: Props) {
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={tokens.colors.primary} size="large" />
           <Text style={styles.loadingText}>Discovering trending spots...</Text>
+          <Text style={styles.loadingText}>{selectedCategory}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, { color: 'red' }]}>ERROR:</Text>
+          <Text style={[styles.loadingText, { color: 'red', fontSize: 12 }]}>{error}</Text>
+          <Text style={[styles.loadingText, { color: 'gray', fontSize: 12, marginTop: 20 }]}>
+            API URL: {process.env.EXPO_PUBLIC_API_URL}
+          </Text>
+          <Text style={[styles.loadingText, { color: 'gray', fontSize: 12 }]}>
+            Category: {selectedCategory}
+          </Text>
         </View>
       </SafeAreaView>
     );
