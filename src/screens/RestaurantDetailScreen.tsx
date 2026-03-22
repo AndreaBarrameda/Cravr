@@ -61,11 +61,18 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         // Load details in background (non-blocking)
         api.getRestaurantDetails(placeId).then((detailsData) => {
           if (detailsData) {
+            // eslint-disable-next-line no-console
+            console.log('Restaurant details:', detailsData);
             setRestaurantData(detailsData);
             // Calculate distance if we have coordinates
             if (detailsData.latitude && detailsData.longitude) {
               const distance = calculateHaversineDistance(lat, lng, detailsData.latitude, detailsData.longitude);
+              // eslint-disable-next-line no-console
+              console.log('Distance calculated:', distance, 'km');
               setDistanceKm(distance);
+            } else {
+              // eslint-disable-next-line no-console
+              console.log('No coordinates in response. Available fields:', Object.keys(detailsData));
             }
           }
         }).catch(() => {
