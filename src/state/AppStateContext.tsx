@@ -17,6 +17,7 @@ type LocationData = {
 
 type AppState = {
   location?: LocationData;
+  searchLocation?: LocationData;
   craving?: CravingStruct;
   selectedCuisine?: string;
   selectedRestaurantId?: string;

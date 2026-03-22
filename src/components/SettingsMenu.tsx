@@ -15,6 +15,8 @@ import { tokens } from '../theme/tokens';
 import { useAppState } from '../state/AppStateContext';
 import { getLocationWithUserConsent } from '../services/locationService';
 import { logout } from '../services/firebaseClient';
+import { LocationSearchModal } from './LocationSearchModal';
+import { GeocodeResult } from '../services/geocoding';
 
 type SettingsMenuProps = {
   visible: boolean;
@@ -31,6 +33,7 @@ export function SettingsMenu({
 }: SettingsMenuProps) {
   const { state, setState } = useAppState();
   const [updatingLocation, setUpdatingLocation] = useState(false);
+  const [locationSearchVisible, setLocationSearchVisible] = useState(false);
 
   const isDark = state.darkMode ?? false;
 
@@ -39,6 +42,18 @@ export function SettingsMenu({
       ...prev,
       darkMode: !prev.darkMode
     }));
+  };
+
+  const handleSelectSearchLocation = (location: GeocodeResult) => {
+    setState((prev) => ({
+      ...prev,
+      searchLocation: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address || location.name
+      }
+    }));
+    setLocationSearchVisible(false);
   };
 
   const handleUpdateLocation = async () => {
@@ -150,6 +165,26 @@ export function SettingsMenu({
               {updatingLocation && <ActivityIndicator color={tokens.colors.primary} size="small" />}
             </TouchableOpacity>
 
+            {/* Search by Location */}
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomColor: isDark ? '#2A2A2A' : tokens.colors.border }]}
+              onPress={() => setLocationSearchVisible(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <Text style={styles.menuItemIcon}>🔍</Text>
+                <View style={styles.menuItemContent}>
+                  <Text style={[styles.menuItemText, { color: isDark ? '#FFFFFF' : tokens.colors.textPrimary }]}>
+                    Search by Location
+                  </Text>
+                  {state.searchLocation?.address && (
+                    <Text style={[styles.menuItemSubtext, { color: isDark ? '#B0B0B0' : tokens.colors.textSecondary }]}>
+                      {state.searchLocation.address}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
+
             {/* Re-run Onboarding */}
             <TouchableOpacity
               style={[styles.menuItem, { borderBottomColor: isDark ? '#2A2A2A' : tokens.colors.border }]}
@@ -180,6 +215,12 @@ export function SettingsMenu({
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
+
+        <LocationSearchModal
+          visible={locationSearchVisible}
+          onClose={() => setLocationSearchVisible(false)}
+          onSelectLocation={handleSelectSearchLocation}
+        />
       </View>
     </Modal>
   );
