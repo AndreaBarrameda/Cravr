@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  FlatList,
-  Image,
-  Dimensions,
-  Alert
+  FlatList
 } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -78,30 +75,21 @@ function buildAttributesFromTags(tags: string[]): Attributes {
   };
 }
 
-type Dish = {
-  dish_id: string;
-  name: string;
-  photo_url: string | null;
-  price: number;
-  restaurant_name: string;
-  restaurant_id: string;
-  rating: number;
-  description: string;
-};
-
 export function DiscoverScreen({ navigation }: Props) {
+  const [text, setText] = useState('');
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedCuisine, setSelectedCuisine] = useState<string>('Any');
   const [loading, setLoading] = useState(false);
-  const [dishes, setDishes] = useState<Dish[]>([]);
-  const [currentDishIndex, setCurrentDishIndex] = useState(0);
-  const [savedDishes, setSavedDishes] = useState<string[]>([]);
   const { state, setState } = useAppState();
 
-  // Fetch dishes when filters change
-  useEffect(() => {
-    fetchDishes();
-  }, [selectedMoodTags, selectedCuisine]);
+  // Auto-navigate if there's an active craving (from HomeScreen)
+  React.useEffect(() => {
+    if (state.craving?.craving_id) {
+      navigation.navigate('CuisineSelection', {
+        cravingId: state.craving.craving_id
+      });
+    }
+  }, [state.craving?.craving_id]);
 
   const moodTags = [
     { label: 'Spicy', emoji: '🌶️', value: 'Spicy' },
@@ -138,206 +126,157 @@ export function DiscoverScreen({ navigation }: Props) {
     );
   };
 
-  const fetchDishes = async () => {
+  const handleSubmit = async () => {
+    const searchText = text.trim() || selectedMoodTags.join(', ') || selectedCuisine;
+    if (!searchText) return;
+
     try {
       setLoading(true);
-      const searchLoc = state.searchLocation || state.location;
-      const location = searchLoc
-        ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
-        : { lat: 10.3157, lng: 123.8854 };
+      const location = state.location
+        ? { lat: state.location.latitude, lng: state.location.longitude }
+        : undefined;
 
+      const result = await api.resolveCraving(searchText, location);
       const attributes = buildAttributesFromTags([...selectedMoodTags, selectedCuisine]);
-      const cravingText = selectedMoodTags.join(', ') || selectedCuisine;
 
-      const result = await api.discoverDishesByAttributes({
-        craving_text: cravingText,
+      setState((prev) => ({
+        ...prev,
+        craving: {
+          craving_id: result.craving_id,
+          normalized: result.normalized,
+          tags: result.tags ?? [],
+          suggested_cuisines: result.suggested_cuisines ?? []
+        }
+      }));
+
+      navigation.navigate('DishDiscovery', {
+        cravingId: result.craving_id,
         cuisine: selectedCuisine === 'Any' ? '' : selectedCuisine,
         attributes,
-        location
+        craving_text: searchText
       });
-
-      setDishes(result.results || []);
-      setCurrentDishIndex(0);
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error('Failed to fetch dishes:', e);
-      Alert.alert('Error', 'Failed to load dishes. Try adjusting your filters.');
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSwipeLeft = () => {
-    setCurrentDishIndex((prev) => prev + 1);
-  };
-
-  const handleSwipeRight = () => {
-    const currentDish = dishes[currentDishIndex];
-    if (currentDish) {
-      setSavedDishes((prev) => [...prev, currentDish.dish_id]);
-      Alert.alert('Saved!', `"${currentDish.name}" saved to favorites`, [
-        { text: 'OK', onPress: () => handleSwipeLeft() }
-      ]);
-    }
-  };
-
-  const handleViewRestaurant = () => {
-    const currentDish = dishes[currentDishIndex];
-    if (currentDish) {
-      navigation.navigate('RestaurantDetail', {
-        restaurantId: currentDish.restaurant_id,
-        cravingId: 'discover',
-        cuisine: selectedCuisine
-      });
-    }
-  };
-
-  const currentDish = dishes[currentDishIndex];
-  const hasMoreDishes = currentDishIndex < dishes.length;
+  const filterCount = selectedMoodTags.length + (selectedCuisine !== 'Any' ? 1 : 0) + (text.trim() ? 1 : 0);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text style={styles.title}>Discover Dishes</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Discover</Text>
+          <WeatherWidget />
 
-        {/* Mood tags - filter section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>MOOD</Text>
-            {selectedMoodTags.length > 0 && (
-              <TouchableOpacity onPress={() => setSelectedMoodTags([])}>
-                <Text style={styles.clearLink}>Clear all</Text>
-              </TouchableOpacity>
-            )}
+          {/* Search input - editorial with emoji prefix */}
+          <View style={styles.section}>
+            <View style={styles.searchHeader}>
+              <Text style={styles.sectionLabel}>SEARCH</Text>
+              {text.trim() && (
+                <TouchableOpacity onPress={() => setText('')}>
+                  <Text style={styles.clearLink}>Clear ✕</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.searchInputWrapper}>
+              <Text style={styles.searchEmoji}>🔍</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Try 'spicy', 'pizza', 'sushi'..."
+                placeholderTextColor={tokens.colors.textTertiary}
+                value={text}
+                onChangeText={setText}
+              />
+            </View>
           </View>
-          <View style={styles.tagGrid}>
-            {moodTags.map((tag) => (
-              <TouchableOpacity
-                key={tag.value}
-                style={[
-                  styles.tag,
-                  selectedMoodTags.includes(tag.value) && styles.tagSelected
-                ]}
-                onPress={() => toggleMoodTag(tag.value)}
-              >
-                <Text style={styles.tagEmoji}>{tag.emoji}</Text>
-                <Text
-                  style={[
-                    styles.tagText,
-                    selectedMoodTags.includes(tag.value) && styles.tagTextSelected
-                  ]}
-                >
-                  {tag.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
-        {/* Cuisine selector */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>CUISINE</Text>
-          <FlatList
-            data={cuisines}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.cuisineChip,
-                  selectedCuisine === item && styles.cuisineChipSelected
-                ]}
-                onPress={() => setSelectedCuisine(item)}
-              >
-                <Text
+          {/* Mood tags */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>MOOD</Text>
+              {selectedMoodTags.length > 0 && (
+                <TouchableOpacity onPress={() => setSelectedMoodTags([])}>
+                  <Text style={styles.clearLink}>Clear all</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.tagGrid}>
+              {moodTags.map((tag) => (
+                <TouchableOpacity
+                  key={tag.value}
                   style={[
-                    styles.cuisineChipText,
-                    selectedCuisine === item && styles.cuisineChipTextSelected
+                    styles.tag,
+                    selectedMoodTags.includes(tag.value) && styles.tagSelected
                   ]}
+                  onPress={() => toggleMoodTag(tag.value)}
                 >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={16}
-            contentContainerStyle={{ gap: tokens.spacing.md, paddingRight: tokens.spacing.xl }}
+                  <Text style={styles.tagEmoji}>{tag.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.tagText,
+                      selectedMoodTags.includes(tag.value) && styles.tagTextSelected
+                    ]}
+                  >
+                    {tag.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Cuisine selector - horizontal scroll */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>CUISINE</Text>
+            <FlatList
+              data={cuisines}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.cuisineChip,
+                    selectedCuisine === item && styles.cuisineChipSelected
+                  ]}
+                  onPress={() => setSelectedCuisine(item)}
+                >
+                  <Text
+                    style={[
+                      styles.cuisineChipText,
+                      selectedCuisine === item && styles.cuisineChipTextSelected
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item) => item}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              contentContainerStyle={{ gap: tokens.spacing.md, paddingRight: tokens.spacing.xl }}
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <CravrButton
+            label={loading ? 'Finding...' : `Discover${filterCount > 0 ? ` (${filterCount})` : ''}`}
+            onPress={handleSubmit}
+            disabled={
+              !text.trim() && selectedMoodTags.length === 0 && selectedCuisine === 'Any'
+            }
+            loading={loading}
           />
         </View>
-
-        {/* Swipe cards section */}
-        <View style={styles.swipeContainer}>
-          {loading && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={tokens.colors.primary} size="large" />
-            </View>
-          )}
-
-          {hasMoreDishes && currentDish ? (
-            <>
-              {/* Dish card */}
-              <View style={styles.dishCard}>
-                {currentDish.photo_url ? (
-                  <Image
-                    source={{ uri: currentDish.photo_url }}
-                    style={styles.dishImage}
-                  />
-                ) : (
-                  <View style={[styles.dishImage, { backgroundColor: tokens.colors.border }]} />
-                )}
-                <View style={styles.dishInfo}>
-                  <Text style={styles.dishName}>{currentDish.name}</Text>
-                  <Text style={styles.dishRestaurant}>{currentDish.restaurant_name}</Text>
-                  <Text style={styles.dishPrice}>₱{currentDish.price.toFixed(0)}</Text>
-                  {currentDish.description && (
-                    <Text style={styles.dishDescription} numberOfLines={2}>
-                      {currentDish.description}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Action buttons */}
-              <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.rejectButton]}
-                  onPress={handleSwipeLeft}
-                >
-                  <Text style={styles.actionEmoji}>👎</Text>
-                  <Text style={styles.actionText}>Pass</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.viewButton]}
-                  onPress={handleViewRestaurant}
-                >
-                  <Text style={styles.actionEmoji}>👀</Text>
-                  <Text style={styles.actionText}>View</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.likeButton]}
-                  onPress={handleSwipeRight}
-                >
-                  <Text style={styles.actionEmoji}>❤️</Text>
-                  <Text style={styles.actionText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : !loading ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>🍽️</Text>
-              <Text style={styles.emptyText}>No more dishes!</Text>
-              <Text style={styles.emptySubtext}>
-                Adjust your filters to discover more
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -459,114 +398,9 @@ const styles = StyleSheet.create({
   cuisineChipTextSelected: {
     color: tokens.colors.textInverse
   },
-  swipeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: tokens.spacing.xl,
-    minHeight: 400
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -30 }, { translateY: -30 }],
-    zIndex: 100
-  },
-  dishCard: {
-    width: '100%',
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.xl,
-    overflow: 'hidden',
-    ...tokens.shadows.lg,
-    marginBottom: tokens.spacing.xl
-  },
-  dishImage: {
-    width: '100%',
-    height: 280,
-    backgroundColor: tokens.colors.border
-  },
-  dishInfo: {
-    padding: tokens.spacing.lg
-  },
-  dishName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm
-  },
-  dishRestaurant: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: tokens.colors.primary,
-    marginBottom: tokens.spacing.xs
-  },
-  dishPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.md
-  },
-  dishDescription: {
-    fontSize: 13,
-    color: tokens.colors.textSecondary,
-    lineHeight: 18
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    gap: tokens.spacing.lg,
-    justifyContent: 'center',
-    width: '100%'
-  },
-  actionButton: {
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radius.lg,
-    alignItems: 'center',
-    gap: tokens.spacing.xs,
-    ...tokens.shadows.sm
-  },
-  rejectButton: {
-    backgroundColor: '#FFE0E0',
-    borderWidth: 1,
-    borderColor: '#FFB3B3'
-  },
-  viewButton: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderWidth: 1,
-    borderColor: tokens.colors.border
-  },
-  likeButton: {
-    backgroundColor: '#FFE0E0',
-    borderWidth: 1,
-    borderColor: '#FF6A6A'
-  },
-  actionEmoji: {
-    fontSize: 20
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: tokens.colors.textPrimary
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: tokens.spacing.xxxl
-  },
-  emptyEmoji: {
-    fontSize: 64,
-    marginBottom: tokens.spacing.lg
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: tokens.colors.textSecondary,
-    textAlign: 'center'
+  footer: {
+    paddingHorizontal: tokens.spacing.xl,
+    paddingBottom: tokens.spacing.xxl,
+    backgroundColor: tokens.colors.background
   }
 });
