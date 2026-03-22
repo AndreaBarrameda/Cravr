@@ -157,6 +157,8 @@ export function DiscoverScreen({ navigation }: Props) {
         location
       });
 
+      // eslint-disable-next-line no-console
+      console.log('API Response:', result.results?.[0]);
       setDishes(result.results || []);
       setCurrentDishIndex(0);
     } catch (e) {
