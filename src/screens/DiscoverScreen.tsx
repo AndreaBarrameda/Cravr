@@ -10,7 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  FlatList
+  FlatList,
+  Image,
+  Alert
 } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -76,10 +78,14 @@ function buildAttributesFromTags(tags: string[]): Attributes {
 }
 
 export function DiscoverScreen({ navigation }: Props) {
+  const [mode, setMode] = useState<'search' | 'swipe'>('search');
   const [text, setText] = useState('');
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedCuisine, setSelectedCuisine] = useState<string>('Any');
   const [loading, setLoading] = useState(false);
+  const [dishes, setDishes] = useState<any[]>([]);
+  const [currentDishIndex, setCurrentDishIndex] = useState(0);
+  const [savedDishes, setSavedDishes] = useState<string[]>([]);
   const { state, setState } = useAppState();
 
   // Auto-navigate if there's an active craving (from HomeScreen)
@@ -118,12 +124,73 @@ export function DiscoverScreen({ navigation }: Props) {
     'Filipino'
   ];
 
+  // Fetch dishes for swipe mode
+  React.useEffect(() => {
+    if (mode === 'swipe') {
+      fetchDishes();
+    }
+  }, [mode, selectedMoodTags, selectedCuisine]);
+
   const toggleMoodTag = (tagValue: string) => {
     setSelectedMoodTags((prev) =>
       prev.includes(tagValue)
         ? prev.filter((t) => t !== tagValue)
         : [...prev, tagValue]
     );
+  };
+
+  const fetchDishes = async () => {
+    try {
+      setLoading(true);
+      const searchLoc = state.searchLocation || state.location;
+      const location = searchLoc
+        ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
+        : { lat: 10.3157, lng: 123.8854 };
+
+      const attributes = buildAttributesFromTags([...selectedMoodTags, selectedCuisine]);
+      const cravingText = selectedMoodTags.join(', ') || selectedCuisine;
+
+      const result = await api.discoverDishesByAttributes({
+        craving_text: cravingText,
+        cuisine: selectedCuisine === 'Any' ? '' : selectedCuisine,
+        attributes,
+        location
+      });
+
+      setDishes(result.results || []);
+      setCurrentDishIndex(0);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch dishes:', e);
+      Alert.alert('Error', 'Failed to load dishes. Try adjusting your filters.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSwipeLeft = () => {
+    setCurrentDishIndex((prev) => prev + 1);
+  };
+
+  const handleSwipeRight = () => {
+    const currentDish = dishes[currentDishIndex];
+    if (currentDish) {
+      setSavedDishes((prev) => [...prev, currentDish.dish_id]);
+      Alert.alert('Saved!', `"${currentDish.name}" saved to favorites`, [
+        { text: 'OK', onPress: () => handleSwipeLeft() }
+      ]);
+    }
+  };
+
+  const handleViewRestaurant = () => {
+    const currentDish = dishes[currentDishIndex];
+    if (currentDish) {
+      navigation.navigate('RestaurantDetail', {
+        restaurantId: currentDish.restaurant_id,
+        cravingId: 'discover',
+        cuisine: selectedCuisine
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -164,6 +231,8 @@ export function DiscoverScreen({ navigation }: Props) {
   };
 
   const filterCount = selectedMoodTags.length + (selectedCuisine !== 'Any' ? 1 : 0) + (text.trim() ? 1 : 0);
+  const currentDish = dishes[currentDishIndex];
+  const hasMoreDishes = currentDishIndex < dishes.length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -171,12 +240,36 @@ export function DiscoverScreen({ navigation }: Props) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <View style={styles.header}>
+          <Text style={styles.title}>Discover</Text>
+          {/* Mode toggle */}
+          <View style={styles.modeToggle}>
+            <TouchableOpacity
+              style={[styles.modeButton, mode === 'search' && styles.modeButtonActive]}
+              onPress={() => setMode('search')}
+            >
+              <Text style={[styles.modeButtonText, mode === 'search' && styles.modeButtonTextActive]}>
+                🔍 Search
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, mode === 'swipe' && styles.modeButtonActive]}
+              onPress={() => setMode('swipe')}
+            >
+              <Text style={[styles.modeButtonText, mode === 'swipe' && styles.modeButtonTextActive]}>
+                🎴 Swipe
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Discover</Text>
-          <WeatherWidget />
+          {mode === 'search' ? (
+            <>
+              <WeatherWidget />
 
           {/* Search input - editorial with emoji prefix */}
           <View style={styles.section}>
@@ -264,18 +357,153 @@ export function DiscoverScreen({ navigation }: Props) {
               contentContainerStyle={{ gap: tokens.spacing.md, paddingRight: tokens.spacing.xl }}
             />
           </View>
+            </>
+          ) : (
+            // Swipe mode
+            <View style={styles.swipeSection}>
+              {/* Mood filter */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionLabel}>MOOD</Text>
+                  {selectedMoodTags.length > 0 && (
+                    <TouchableOpacity onPress={() => setSelectedMoodTags([])}>
+                      <Text style={styles.clearLink}>Clear all</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <View style={styles.tagGrid}>
+                  {moodTags.map((tag) => (
+                    <TouchableOpacity
+                      key={tag.value}
+                      style={[
+                        styles.tag,
+                        selectedMoodTags.includes(tag.value) && styles.tagSelected
+                      ]}
+                      onPress={() => toggleMoodTag(tag.value)}
+                    >
+                      <Text style={styles.tagEmoji}>{tag.emoji}</Text>
+                      <Text
+                        style={[
+                          styles.tagText,
+                          selectedMoodTags.includes(tag.value) && styles.tagTextSelected
+                        ]}
+                      >
+                        {tag.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Cuisine filter */}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>CUISINE</Text>
+                <FlatList
+                  data={cuisines}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.cuisineChip,
+                        selectedCuisine === item && styles.cuisineChipSelected
+                      ]}
+                      onPress={() => setSelectedCuisine(item)}
+                    >
+                      <Text
+                        style={[
+                          styles.cuisineChipText,
+                          selectedCuisine === item && styles.cuisineChipTextSelected
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={(item) => item}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  contentContainerStyle={{ gap: tokens.spacing.md, paddingRight: tokens.spacing.xl }}
+                />
+              </View>
+
+              {/* Dish card */}
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color={tokens.colors.primary} size="large" />
+                </View>
+              ) : hasMoreDishes && currentDish ? (
+                <>
+                  <View style={styles.dishCard}>
+                    {currentDish.photo_url ? (
+                      <Image
+                        source={{ uri: currentDish.photo_url }}
+                        style={styles.dishImage}
+                      />
+                    ) : (
+                      <View style={[styles.dishImage, { backgroundColor: tokens.colors.border }]} />
+                    )}
+                    <View style={styles.dishInfo}>
+                      <Text style={styles.dishName}>{currentDish.name}</Text>
+                      <Text style={styles.dishRestaurant}>{currentDish.restaurant_name}</Text>
+                      <Text style={styles.dishPrice}>₱{currentDish.price.toFixed(0)}</Text>
+                      {currentDish.description && (
+                        <Text style={styles.dishDescription} numberOfLines={2}>
+                          {currentDish.description}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Action buttons */}
+                  <View style={styles.actionsContainer}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.rejectButton]}
+                      onPress={handleSwipeLeft}
+                    >
+                      <Text style={styles.actionEmoji}>👎</Text>
+                      <Text style={styles.actionText}>Pass</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.viewButton]}
+                      onPress={handleViewRestaurant}
+                    >
+                      <Text style={styles.actionEmoji}>👀</Text>
+                      <Text style={styles.actionText}>View</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.likeButton]}
+                      onPress={handleSwipeRight}
+                    >
+                      <Text style={styles.actionEmoji}>❤️</Text>
+                      <Text style={styles.actionText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : !loading ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyEmoji}>🍽️</Text>
+                  <Text style={styles.emptyText}>No more dishes!</Text>
+                  <Text style={styles.emptySubtext}>Adjust your filters to discover more</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
         </ScrollView>
 
-        <View style={styles.footer}>
-          <CravrButton
-            label={loading ? 'Finding...' : `Discover${filterCount > 0 ? ` (${filterCount})` : ''}`}
-            onPress={handleSubmit}
-            disabled={
-              !text.trim() && selectedMoodTags.length === 0 && selectedCuisine === 'Any'
-            }
-            loading={loading}
-          />
-        </View>
+        {mode === 'search' && (
+          <View style={styles.footer}>
+            <CravrButton
+              label={loading ? 'Finding...' : `Discover${filterCount > 0 ? ` (${filterCount})` : ''}`}
+              onPress={handleSubmit}
+              disabled={
+                !text.trim() && selectedMoodTags.length === 0 && selectedCuisine === 'Any'
+              }
+              loading={loading}
+            />
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -286,17 +514,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: tokens.colors.background
   },
-  scrollContent: {
+  header: {
     paddingHorizontal: tokens.spacing.xl,
     paddingTop: tokens.spacing.lg,
-    paddingBottom: 200
+    paddingBottom: tokens.spacing.lg,
+    backgroundColor: tokens.colors.background
   },
   title: {
     fontSize: tokens.typography.h2.fontSize,
     fontWeight: tokens.typography.h2.fontWeight,
     letterSpacing: tokens.typography.h2.letterSpacing,
     color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.xxxl
+    marginBottom: tokens.spacing.md
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    gap: tokens.spacing.sm,
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.xs,
+    borderWidth: 1,
+    borderColor: tokens.colors.border
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: tokens.spacing.sm,
+    paddingHorizontal: tokens.spacing.md,
+    borderRadius: tokens.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  modeButtonActive: {
+    backgroundColor: tokens.colors.primary
+  },
+  modeButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: tokens.colors.textSecondary
+  },
+  modeButtonTextActive: {
+    color: tokens.colors.textInverse
+  },
+  scrollContent: {
+    paddingHorizontal: tokens.spacing.xl,
+    paddingTop: tokens.spacing.lg,
+    paddingBottom: 200
+  },
+  swipeSection: {
+    flex: 1
   },
   section: {
     marginBottom: tokens.spacing.xxxl
@@ -402,5 +667,108 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.xl,
     paddingBottom: tokens.spacing.xxl,
     backgroundColor: tokens.colors.background
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 300
+  },
+  dishCard: {
+    width: '100%',
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.xl,
+    overflow: 'hidden',
+    ...tokens.shadows.lg,
+    marginVertical: tokens.spacing.xl
+  },
+  dishImage: {
+    width: '100%',
+    height: 280,
+    backgroundColor: tokens.colors.border
+  },
+  dishInfo: {
+    padding: tokens.spacing.lg
+  },
+  dishName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm
+  },
+  dishRestaurant: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: tokens.colors.primary,
+    marginBottom: tokens.spacing.xs
+  },
+  dishPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.md
+  },
+  dishDescription: {
+    fontSize: 13,
+    color: tokens.colors.textSecondary,
+    lineHeight: 18
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: tokens.spacing.lg,
+    justifyContent: 'center',
+    width: '100%',
+    marginBottom: tokens.spacing.xl
+  },
+  actionButton: {
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.radius.lg,
+    alignItems: 'center',
+    gap: tokens.spacing.xs,
+    ...tokens.shadows.sm
+  },
+  rejectButton: {
+    backgroundColor: '#FFE0E0',
+    borderWidth: 1,
+    borderColor: '#FFB3B3'
+  },
+  viewButton: {
+    backgroundColor: tokens.colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: tokens.colors.border
+  },
+  likeButton: {
+    backgroundColor: '#FFE0E0',
+    borderWidth: 1,
+    borderColor: '#FF6A6A'
+  },
+  actionEmoji: {
+    fontSize: 20
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: tokens.colors.textPrimary
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: tokens.spacing.xxxl
+  },
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: tokens.spacing.lg
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: tokens.colors.textPrimary,
+    marginBottom: tokens.spacing.sm
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: tokens.colors.textSecondary,
+    textAlign: 'center'
   }
 });
