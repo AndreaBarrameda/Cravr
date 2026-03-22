@@ -248,14 +248,16 @@ export function TrendingScreen({ navigation }: Props) {
     if (selectedCategory === 'all') return restaurants;
     if (selectedCategory === 'newest') return restaurants.slice(0, 8); // Assume first results are newest
     if (selectedCategory === 'garden') {
-      return restaurants.filter((r) =>
+      const filtered = restaurants.filter((r) =>
         r.vibe_tags?.some((tag) => tag.toLowerCase().includes('garden') || tag.toLowerCase().includes('outdoor'))
       );
+      return filtered.length > 0 ? filtered : restaurants; // Show all if no garden matches
     }
     if (selectedCategory === 'city-view') {
-      return restaurants.filter((r) =>
+      const filtered = restaurants.filter((r) =>
         r.vibe_tags?.some((tag) => tag.toLowerCase().includes('view') || tag.toLowerCase().includes('city') || tag.toLowerCase().includes('rooftop'))
       );
+      return filtered.length > 0 ? filtered : restaurants; // Show all if no view matches
     }
     return restaurants;
   };
@@ -536,21 +538,6 @@ export function TrendingScreen({ navigation }: Props) {
                 {renderSmallCard({ item: restaurant })}
               </View>
             ))}
-          </View>
-        )}
-
-        {/* Empty State for Category */}
-        {selectedCategory !== 'all' && trendingRestaurants.length === 0 && (
-          <View style={styles.section}>
-            <View style={styles.emptyFeedContainer}>
-              <Text style={styles.emptyFeedEmoji}>🍽️</Text>
-              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>
-                No restaurants found
-              </Text>
-              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
-                Try a different category
-              </Text>
-            </View>
           </View>
         )}
 
