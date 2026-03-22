@@ -95,6 +95,7 @@ export function TrendingScreen({ navigation }: Props) {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [liveFeed, setLiveFeed] = useState<(FoodPost | FoodReview)[]>([]);
   const [loadingFeed, setLoadingFeed] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<'newest' | 'garden' | 'city-view' | 'all'>('all');
 
   // Load trending restaurants and data
   useEffect(() => {
@@ -242,12 +243,29 @@ export function TrendingScreen({ navigation }: Props) {
     }, [])
   );
 
+  // Filter restaurants based on selected category
+  const filterRestaurantsByCategory = (restaurants: TrendingRestaurant[]) => {
+    if (selectedCategory === 'all') return restaurants;
+    if (selectedCategory === 'newest') return restaurants.slice(0, 8); // Assume first results are newest
+    if (selectedCategory === 'garden') {
+      return restaurants.filter((r) =>
+        r.vibe_tags?.some((tag) => tag.toLowerCase().includes('garden') || tag.toLowerCase().includes('outdoor'))
+      );
+    }
+    if (selectedCategory === 'city-view') {
+      return restaurants.filter((r) =>
+        r.vibe_tags?.some((tag) => tag.toLowerCase().includes('view') || tag.toLowerCase().includes('city') || tag.toLowerCase().includes('rooftop'))
+      );
+    }
+    return restaurants;
+  };
+
   // Organize restaurants by category
   const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
   const topRatedRestaurants = [...allRestaurants]
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 5);
-  const trendingRestaurants = allRestaurants.slice(0, 8);
+  const trendingRestaurants = filterRestaurantsByCategory(allRestaurants).slice(0, 8);
 
   const renderCarouselCard = ({ item }: { item: TrendingRestaurant }) => (
     <TouchableOpacity
@@ -351,9 +369,47 @@ export function TrendingScreen({ navigation }: Props) {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.title}>🔥 What's Trending</Text>
-              <Text style={styles.subtitle}>In Cebu right now</Text>
+              <Text style={styles.subtitle}>
+                In {state.searchLocation?.address?.split(',')[0] || 'Cebu'} right now
+              </Text>
             </View>
           </View>
+        </View>
+
+        {/* Category Filters */}
+        <View style={styles.categoryContainer}>
+          <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'newest' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('newest')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'newest' && styles.categoryLabelActive]}>
+              ✨ Newest
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'garden' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('garden')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'garden' && styles.categoryLabelActive]}>
+              🌿 Garden
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'city-view' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('city-view')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'city-view' && styles.categoryLabelActive]}>
+              🏙️ City View
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.categoryPill, selectedCategory === 'all' && styles.categoryPillActive]}
+            onPress={() => setSelectedCategory('all')}
+          >
+            <Text style={[styles.categoryLabel, selectedCategory === 'all' && styles.categoryLabelActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Weather Widget */}
@@ -444,7 +500,7 @@ export function TrendingScreen({ navigation }: Props) {
         )}
 
         {/* Michelin Restaurants Section */}
-        {michelinRestaurants.length > 0 && (
+        {selectedCategory === 'all' && michelinRestaurants.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>MICHELIN HONORED</Text>
             {michelinRestaurants.slice(0, 5).map((restaurant) => (
@@ -456,7 +512,7 @@ export function TrendingScreen({ navigation }: Props) {
         )}
 
         {/* Top Rated Section */}
-        {topRatedRestaurants.length > 0 && (
+        {selectedCategory === 'all' && topRatedRestaurants.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>TOP RATED</Text>
             {topRatedRestaurants.map((restaurant, idx) => (
@@ -464,6 +520,37 @@ export function TrendingScreen({ navigation }: Props) {
                 {renderSmallCard({ item: restaurant })}
               </View>
             ))}
+          </View>
+        )}
+
+        {/* Category Results Section */}
+        {selectedCategory !== 'all' && trendingRestaurants.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {selectedCategory === 'newest' && '✨ NEWEST'}
+              {selectedCategory === 'garden' && '🌿 GARDEN SETTING'}
+              {selectedCategory === 'city-view' && '🏙️ CITY VIEWS'}
+            </Text>
+            {trendingRestaurants.map((restaurant) => (
+              <View key={restaurant.restaurant_id}>
+                {renderSmallCard({ item: restaurant })}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Empty State for Category */}
+        {selectedCategory !== 'all' && trendingRestaurants.length === 0 && (
+          <View style={styles.section}>
+            <View style={styles.emptyFeedContainer}>
+              <Text style={styles.emptyFeedEmoji}>🍽️</Text>
+              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>
+                No restaurants found
+              </Text>
+              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
+                Try a different category
+              </Text>
+            </View>
           </View>
         )}
 
@@ -523,6 +610,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: tokens.colors.background
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: tokens.spacing.xl,
+    marginBottom: tokens.spacing.xl,
+    gap: tokens.spacing.sm
+  },
+  categoryPill: {
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.lg,
+    backgroundColor: tokens.colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: tokens.colors.border
+  },
+  categoryPillActive: {
+    backgroundColor: tokens.colors.primary,
+    borderColor: tokens.colors.primary
+  },
+  categoryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: tokens.colors.textSecondary
+  },
+  categoryLabelActive: {
+    color: tokens.colors.textInverse
   },
   loadingContainer: {
     flex: 1,
