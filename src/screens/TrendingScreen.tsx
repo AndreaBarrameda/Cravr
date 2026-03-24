@@ -25,6 +25,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, collectionGroup, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { tokens } from '../theme/tokens';
 import type { FoodPost, FoodReview } from '../services/firebaseClient';
+import { saveBookmarkedRestaurant, removeBookmarkedRestaurant, getBookmarkedRestaurants } from '../services/firebaseClient';
 import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = NativeStackScreenProps<TrendingStackParamList, 'TrendingHome'>;
@@ -97,6 +98,7 @@ export function TrendingScreen({ navigation }: Props) {
   const [loadingFeed, setLoadingFeed] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<'newest' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'all'>('newest');
   const [error, setError] = useState<string | null>(null);
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
 
   // Load trending restaurants based on selected category
   useEffect(() => {
@@ -108,6 +110,13 @@ export function TrendingScreen({ navigation }: Props) {
         const location = searchLoc
           ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
           : { lat: 10.3157, lng: 123.8854 };
+
+        // Load bookmarked restaurants
+        if (state.authUser?.id) {
+          const { bookmarks } = await getBookmarkedRestaurants(state.authUser.id);
+          const bookmarkedSet = new Set(bookmarks.map((b: any) => b.restaurant_id));
+          setBookmarkedIds(bookmarkedSet);
+        }
 
         // Fetch Michelin Guide
         try {
@@ -141,7 +150,7 @@ export function TrendingScreen({ navigation }: Props) {
     };
 
     fetchData();
-  }, [state.location, state.searchLocation, selectedCategory]);
+  }, [state.location, state.searchLocation, selectedCategory, state.authUser?.id]);
 
   // Load live feed (posts and reviews from all users)
   useFocusEffect(
@@ -242,6 +251,37 @@ export function TrendingScreen({ navigation }: Props) {
     }, [])
   );
 
+  // Handle bookmark
+  const handleToggleBookmark = async (restaurant: TrendingRestaurant) => {
+    if (!state.authUser?.id) return;
+
+    const isBookmarked = bookmarkedIds.has(restaurant.restaurant_id);
+
+    try {
+      if (isBookmarked) {
+        await removeBookmarkedRestaurant(state.authUser.id, restaurant.restaurant_id);
+        const newSet = new Set(bookmarkedIds);
+        newSet.delete(restaurant.restaurant_id);
+        setBookmarkedIds(newSet);
+      } else {
+        await saveBookmarkedRestaurant(state.authUser.id, {
+          restaurant_id: restaurant.restaurant_id,
+          name: restaurant.name,
+          rating: restaurant.rating,
+          price_level: restaurant.price_level,
+          distance_meters: restaurant.distance_meters,
+          hero_photo_url: restaurant.hero_photo_url || undefined
+        });
+        const newSet = new Set(bookmarkedIds);
+        newSet.add(restaurant.restaurant_id);
+        setBookmarkedIds(newSet);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle bookmark:', error);
+    }
+  };
+
   // Organize restaurants by category
   const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
   const topRatedRestaurants = [...allRestaurants]
@@ -250,86 +290,108 @@ export function TrendingScreen({ navigation }: Props) {
   const trendingRestaurants = allRestaurants.slice(0, 8);
 
   const renderCarouselCard = ({ item }: { item: TrendingRestaurant }) => (
-    <TouchableOpacity
-      style={styles.carouselCard}
-      onPress={() => {
-        navigation.navigate('RestaurantDetail' as any, {
-          restaurantId: item.restaurant_id,
-          cravingId: 'trending',
-          cuisine: ''
-        });
-      }}
-      activeOpacity={0.9}
-    >
-      {item.hero_photo_url && (
-        <Image
-          source={{ uri: item.hero_photo_url }}
-          style={styles.carouselImage}
-        />
-      )}
-      <View style={styles.carouselOverlay}>
-        <View style={styles.carouselContent}>
-          <Text style={styles.carouselName}>{item.name}</Text>
-          <Text style={styles.carouselMeta}>
-            {item.rating.toFixed(1)} ★ • {'$'.repeat(item.price_level || 1)}
-          </Text>
-          {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
-            <View
-              style={[
-                styles.carouselMichelinBadge,
-                { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
-              ]}
-            >
-              <Text style={styles.carouselMichelinText}>
-                {getMichelinBadge(item.michelin_designation)?.icon}
-              </Text>
-            </View>
-          ) : null}
+    <View style={styles.carouselCard}>
+      <TouchableOpacity
+        style={styles.carouselTouchable}
+        onPress={() => {
+          navigation.navigate('RestaurantDetail' as any, {
+            restaurantId: item.restaurant_id,
+            cravingId: 'trending',
+            cuisine: ''
+          });
+        }}
+        activeOpacity={0.9}
+      >
+        {item.hero_photo_url && (
+          <Image
+            source={{ uri: item.hero_photo_url }}
+            style={styles.carouselImage}
+          />
+        )}
+        <View style={styles.carouselOverlay}>
+          <View style={styles.carouselContent}>
+            <Text style={styles.carouselName}>{item.name}</Text>
+            <Text style={styles.carouselMeta}>
+              {item.rating.toFixed(1)} ★ • {'$'.repeat(item.price_level || 1)}
+            </Text>
+            {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
+              <View
+                style={[
+                  styles.carouselMichelinBadge,
+                  { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
+                ]}
+              >
+                <Text style={styles.carouselMichelinText}>
+                  {getMichelinBadge(item.michelin_designation)?.icon}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.bookmarkButton}
+        onPress={() => handleToggleBookmark(item)}
+      >
+        <Text style={styles.bookmarkIcon}>
+          {bookmarkedIds.has(item.restaurant_id) ? '🔖' : '🔖'}
+        </Text>
+      </TouchableOpacity>
+    </View>
   );
 
   const renderSmallCard = ({ item }: { item: TrendingRestaurant }) => (
-    <TouchableOpacity
-      style={styles.smallCard}
-      onPress={() => {
-        navigation.navigate('RestaurantDetail' as any, {
-          restaurantId: item.restaurant_id,
-          cravingId: 'trending',
-          cuisine: ''
-        });
-      }}
-    >
-      <View style={styles.smallCardContent}>
-        <View>
-          <Text style={styles.smallCardName}>{item.name}</Text>
-          <Text style={styles.smallCardMeta}>
-            {item.rating.toFixed(1)} ★ •{'$'.repeat(item.price_level || 1)}
-            {item.distance_meters && (
-              <>
-                {' '}
-                • {item.distance_meters > 1000
-                  ? `${(item.distance_meters / 1000).toFixed(1)}km`
-                  : `${item.distance_meters}m`}
-              </>
-            )}
-          </Text>
-        </View>
-        {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
-          <View
-            style={[
-              styles.smallMichelinBadge,
-              { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
-            ]}
-          >
-            <Text style={styles.smallMichelinText}>
-              {getMichelinBadge(item.michelin_designation)?.icon}
+    <View>
+      <TouchableOpacity
+        style={styles.smallCard}
+        onPress={() => {
+          navigation.navigate('RestaurantDetail' as any, {
+            restaurantId: item.restaurant_id,
+            cravingId: 'trending',
+            cuisine: ''
+          });
+        }}
+      >
+        <View style={styles.smallCardContent}>
+          <View style={styles.smallCardInfo}>
+            <Text style={styles.smallCardName}>{item.name}</Text>
+            <Text style={styles.smallCardMeta}>
+              {item.rating.toFixed(1)} ★ •{'$'.repeat(item.price_level || 1)}
+              {item.distance_meters && (
+                <>
+                  {' '}
+                  • {item.distance_meters > 1000
+                    ? `${(item.distance_meters / 1000).toFixed(1)}km`
+                    : `${item.distance_meters}m`}
+                </>
+              )}
             </Text>
           </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
+          <View style={styles.smallCardActions}>
+            {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
+              <View
+                style={[
+                  styles.smallMichelinBadge,
+                  { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
+                ]}
+              >
+                <Text style={styles.smallMichelinText}>
+                  {getMichelinBadge(item.michelin_designation)?.icon}
+                </Text>
+              </View>
+            ) : null}
+            <TouchableOpacity
+              onPress={() => handleToggleBookmark(item)}
+              style={styles.smallBookmarkButton}
+            >
+              <Text style={styles.smallBookmarkIcon}>
+                {bookmarkedIds.has(item.restaurant_id) ? '🔖' : '☐'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 
   if (loading) {
@@ -634,16 +696,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: tokens.spacing.xl,
     marginBottom: tokens.spacing.xl,
-    gap: tokens.spacing.sm,
+    gap: tokens.spacing.md,
     paddingBottom: tokens.spacing.md
   },
   categoryPill: {
-    paddingHorizontal: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.lg,
     paddingVertical: tokens.spacing.sm,
     borderRadius: tokens.radius.lg,
     backgroundColor: tokens.colors.backgroundLight,
     borderWidth: 1,
-    borderColor: tokens.colors.border
+    borderColor: tokens.colors.border,
+    minHeight: 40
   },
   categoryPillActive: {
     backgroundColor: tokens.colors.primary,
@@ -670,7 +733,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: tokens.spacing.xl,
     paddingTop: tokens.spacing.xl,
-    paddingBottom: tokens.spacing.xxl
+    paddingBottom: tokens.spacing.lg
   },
   headerTop: {
     flexDirection: 'row',
@@ -681,51 +744,78 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm
+    marginBottom: tokens.spacing.sm,
+    lineHeight: 40
   },
   subtitle: {
-    fontSize: 14,
-    color: tokens.colors.textSecondary
+    fontSize: 15,
+    color: tokens.colors.textSecondary,
+    lineHeight: 20
   },
   carouselSection: {
-    marginBottom: tokens.spacing.xxxl
+    marginBottom: tokens.spacing.xxxl,
+    marginTop: tokens.spacing.xl
   },
   carouselContent: {
     paddingHorizontal: tokens.spacing.xl,
-    gap: tokens.spacing.xl
+    gap: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.md
   },
   carouselCard: {
     width: CARD_WIDTH,
-    height: 320,
+    height: 240,
     borderRadius: tokens.radius.xl,
     overflow: 'hidden',
-    ...tokens.shadows.lg
+    ...tokens.shadows.lg,
+    position: 'relative'
+  },
+  carouselTouchable: {
+    width: '100%',
+    height: '100%'
   },
   carouselImage: {
     width: '100%',
     height: '100%'
+  },
+  bookmarkButton: {
+    position: 'absolute',
+    top: tokens.spacing.md,
+    right: tokens.spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...tokens.shadows.md
+  },
+  bookmarkIcon: {
+    fontSize: 24
   },
   carouselOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: tokens.spacing.xl,
-    paddingBottom: tokens.spacing.xxl
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    padding: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.xl,
+    paddingTop: tokens.spacing.xxl
   },
   carouselContentGap: {
     gap: tokens.spacing.md
   },
   carouselName: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
-    color: tokens.colors.textInverse
+    color: tokens.colors.textInverse,
+    marginBottom: tokens.spacing.xs
   },
   carouselMeta: {
-    fontSize: 14,
+    fontSize: 13,
     color: tokens.colors.textInverse,
-    fontWeight: '500'
+    fontWeight: '500',
+    opacity: 0.95
   },
   carouselMichelinBadge: {
     paddingHorizontal: tokens.spacing.md,
@@ -741,61 +831,92 @@ const styles = StyleSheet.create({
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: tokens.spacing.sm,
+    gap: tokens.spacing.md,
     marginTop: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.lg
+    paddingBottom: tokens.spacing.md
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: tokens.colors.border
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: tokens.colors.border,
+    opacity: 0.5
   },
   dotActive: {
     backgroundColor: tokens.colors.primary,
-    width: 24
+    width: 20,
+    opacity: 1
   },
   section: {
     paddingHorizontal: tokens.spacing.xl,
-    marginBottom: tokens.spacing.xxxl
+    marginBottom: tokens.spacing.xxxl,
+    marginTop: tokens.spacing.xl
   },
   sectionTitle: {
     ...tokens.typography.label,
     color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.lg
+    marginBottom: tokens.spacing.xl,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    fontWeight: '700'
   },
   smallCard: {
     backgroundColor: tokens.colors.backgroundLight,
     borderRadius: tokens.radius.md,
-    padding: tokens.spacing.md,
-    marginBottom: tokens.spacing.md,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
     borderWidth: 1,
     borderColor: tokens.colors.border,
-    ...tokens.shadows.sm
+    ...tokens.shadows.sm,
+    minHeight: 70
   },
   smallCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'flex-start',
+    gap: tokens.spacing.md
+  },
+  smallCardInfo: {
+    flex: 1
+  },
+  smallCardActions: {
+    flexDirection: 'row',
+    gap: tokens.spacing.sm,
+    alignItems: 'center',
+    flexShrink: 0
   },
   smallCardName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
     marginBottom: tokens.spacing.xs
   },
   smallCardMeta: {
-    fontSize: 12,
+    fontSize: 13,
     color: tokens.colors.textSecondary,
     fontWeight: '500'
   },
+  smallBookmarkButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  smallBookmarkIcon: {
+    fontSize: 20
+  },
   smallMichelinBadge: {
-    paddingHorizontal: tokens.spacing.sm,
-    paddingVertical: tokens.spacing.xs,
-    borderRadius: tokens.radius.sm
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0
   },
   smallMichelinText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: tokens.colors.textInverse
   },
@@ -810,26 +931,29 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.backgroundLight,
     borderRadius: tokens.radius.md,
     padding: tokens.spacing.lg,
-    marginBottom: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg,
     borderLeftWidth: 4,
     borderLeftColor: tokens.colors.primary,
     borderWidth: 1,
     borderColor: tokens.colors.border,
-    ...tokens.shadows.sm
+    ...tokens.shadows.sm,
+    minHeight: 70
   },
   michelinCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'flex-start',
+    gap: tokens.spacing.md
   },
   michelinCardName: {
     fontSize: 15,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.xs
+    marginBottom: tokens.spacing.xs,
+    flex: 1
   },
   michelinCardMeta: {
-    fontSize: 12,
+    fontSize: 13,
     color: tokens.colors.textSecondary,
     fontWeight: '500'
   },

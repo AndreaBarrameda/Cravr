@@ -14,6 +14,7 @@ import { ScreenContainer, CravrButton } from '../components/UI';
 import { useAppState } from '../state/AppStateContext';
 import { api } from '../api/client';
 import { calculateHaversineDistance, formatDistance } from '../utils/distance';
+import { saveBookmarkedRestaurant, removeBookmarkedRestaurant, getBookmarkedRestaurants } from '../services/firebaseClient';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDetail'>;
 
@@ -48,12 +49,20 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   const [selectedDish, setSelectedDish] = useState<Dish | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const lat = state.location?.latitude ?? 34.0522;
         const lng = state.location?.longitude ?? -118.2437;
+
+        // Load bookmark state
+        if (state.authUser?.id) {
+          const { bookmarks } = await getBookmarkedRestaurants(state.authUser.id);
+          const isCurrentRestaurantBookmarked = bookmarks.some((b: any) => b.restaurant_id === restaurantId);
+          setIsBookmarked(isCurrentRestaurantBookmarked);
+        }
 
         // Extract place_id from restaurant_id (format: rst_<place_id>)
         const placeId = restaurantId.replace(/^rst_/, '');
@@ -108,7 +117,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
     };
 
     fetchData();
-  }, [restaurantId, cravingId, state.location, dishId]);
+  }, [restaurantId, cravingId, state.location, dishId, state.authUser?.id]);
 
   const onContinue = () => {
     if (selectedDish) {
@@ -119,6 +128,30 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         cravingId,
         cuisine
       });
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    if (!state.authUser?.id || !restaurantData) return;
+
+    try {
+      if (isBookmarked) {
+        await removeBookmarkedRestaurant(state.authUser.id, restaurantId);
+        setIsBookmarked(false);
+      } else {
+        await saveBookmarkedRestaurant(state.authUser.id, {
+          restaurant_id: restaurantId,
+          name: restaurantData.name,
+          rating: restaurantData.rating,
+          price_level: restaurantData.price_level,
+          distance_meters: restaurantData.distance_meters,
+          hero_photo_url: restaurantData.hero_photo_url || undefined
+        });
+        setIsBookmarked(true);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to toggle bookmark:', error);
     }
   };
 
@@ -136,11 +169,23 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             )}
 
             <View style={styles.header}>
-              <Text style={styles.restaurantName}>{restaurantData.name}</Text>
-              <View style={styles.ratingRow}>
-                <Text style={styles.rating}>
-                  {restaurantData.rating} ★ • {'$'.repeat(restaurantData.price_level)}
-                </Text>
+              <View style={styles.headerTop}>
+                <View style={styles.headerInfo}>
+                  <Text style={styles.restaurantName}>{restaurantData.name}</Text>
+                  <View style={styles.ratingRow}>
+                    <Text style={styles.rating}>
+                      {restaurantData.rating} ★ • {'$'.repeat(restaurantData.price_level)}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.bookmarkBtn}
+                  onPress={handleToggleBookmark}
+                >
+                  <Text style={styles.bookmarkBtnIcon}>
+                    {isBookmarked ? '🔖' : '☐'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -221,6 +266,15 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 20
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12
+  },
+  headerInfo: {
+    flex: 1
+  },
   restaurantName: {
     fontSize: 28,
     fontWeight: '700',
@@ -234,6 +288,22 @@ const styles = StyleSheet.create({
   rating: {
     fontSize: 14,
     color: '#6B6B6B'
+  },
+  bookmarkBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3
+  },
+  bookmarkBtnIcon: {
+    fontSize: 24
   },
   infoCard: {
     backgroundColor: '#FFFFFF',

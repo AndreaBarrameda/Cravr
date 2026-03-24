@@ -86,6 +86,7 @@ export function DiscoverScreen({ navigation }: Props) {
   const [dishes, setDishes] = useState<any[]>([]);
   const [currentDishIndex, setCurrentDishIndex] = useState(0);
   const [savedDishes, setSavedDishes] = useState<string[]>([]);
+  const [imageLoadError, setImageLoadError] = useState<{ [key: string]: boolean }>({});
   const { state, setState } = useAppState();
 
   // Auto-navigate if there's an active craving (from HomeScreen)
@@ -235,6 +236,19 @@ export function DiscoverScreen({ navigation }: Props) {
   const filterCount = selectedMoodTags.length + (selectedCuisine !== 'Any' ? 1 : 0) + (text.trim() ? 1 : 0);
   const currentDish = dishes[currentDishIndex];
   const hasMoreDishes = currentDishIndex < dishes.length;
+
+  // Debug logging
+  React.useEffect(() => {
+    if (currentDish) {
+      // eslint-disable-next-line no-console
+      console.log('Current Dish:', {
+        name: currentDish.name,
+        photo_url: currentDish.photo_url,
+        has_photo: !!currentDish.photo_url,
+        imageError: imageLoadError[currentDish.dish_id]
+      });
+    }
+  }, [currentDish, imageLoadError]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -437,16 +451,24 @@ export function DiscoverScreen({ navigation }: Props) {
                 <>
                   <View style={styles.dishCard}>
                     <View style={styles.dishImageContainer}>
-                      {currentDish.photo_url ? (
+                      {currentDish.photo_url && !imageLoadError[currentDish.dish_id] ? (
                         <Image
                           source={{ uri: currentDish.photo_url }}
                           style={styles.dishImage}
                           resizeMode="cover"
+                          onError={() => {
+                            setImageLoadError(prev => ({
+                              ...prev,
+                              [currentDish.dish_id]: true
+                            }));
+                          }}
                         />
                       ) : null}
-                      <View style={[styles.dishImage, styles.dishImagePlaceholder]}>
-                        <Text style={styles.dishImageEmoji}>🍽️</Text>
-                      </View>
+                      {!currentDish.photo_url || imageLoadError[currentDish.dish_id] ? (
+                        <View style={[styles.dishImage, styles.dishImagePlaceholder]}>
+                          <Text style={styles.dishImageEmoji}>🍽️</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <View style={styles.dishInfo}>
                       <Text style={styles.dishName}>{currentDish.name}</Text>

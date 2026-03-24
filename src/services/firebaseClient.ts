@@ -16,7 +16,9 @@ import {
   query,
   orderBy,
   getDocs,
-  Timestamp
+  Timestamp,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -263,5 +265,88 @@ export async function getUserReviews(userId: string) {
     // eslint-disable-next-line no-console
     console.error('Failed to load reviews:', error);
     return { reviews: [], error: error.message || 'Failed to load reviews' };
+  }
+}
+
+// Bookmarked restaurants
+export type BookmarkedRestaurant = {
+  restaurant_id: string;
+  name: string;
+  rating?: number;
+  price_level?: number;
+  distance_meters?: number;
+  hero_photo_url?: string;
+  savedAt: Timestamp;
+};
+
+export async function saveBookmarkedRestaurant(userId: string, restaurant: Omit<BookmarkedRestaurant, 'savedAt'>) {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const currentBookmarks = userDoc.data().bookmarkedRestaurants || [];
+      // Check if already bookmarked
+      const alreadyBookmarked = currentBookmarks.some((b: any) => b.restaurant_id === restaurant.restaurant_id);
+      if (alreadyBookmarked) {
+        return { error: null };
+      }
+    }
+
+    await setDoc(
+      userRef,
+      {
+        bookmarkedRestaurants: arrayUnion({
+          restaurant_id: restaurant.restaurant_id,
+          name: restaurant.name || '',
+          rating: restaurant.rating || 0,
+          price_level: restaurant.price_level || 1,
+          distance_meters: restaurant.distance_meters || 0,
+          hero_photo_url: restaurant.hero_photo_url || null,
+          savedAt: Timestamp.now()
+        })
+      },
+      { merge: true }
+    );
+    return { error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to bookmark restaurant:', error);
+    return { error: error.message || 'Failed to bookmark restaurant' };
+  }
+}
+
+export async function removeBookmarkedRestaurant(userId: string, restaurantId: string) {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const bookmarks = userDoc.data().bookmarkedRestaurants || [];
+      const updatedBookmarks = bookmarks.filter((b: BookmarkedRestaurant) => b.restaurant_id !== restaurantId);
+      await setDoc(
+        doc(db, 'users', userId),
+        { bookmarkedRestaurants: updatedBookmarks },
+        { merge: true }
+      );
+    }
+    return { error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to remove bookmark:', error);
+    return { error: error.message || 'Failed to remove bookmark' };
+  }
+}
+
+export async function getBookmarkedRestaurants(userId: string) {
+  try {
+    const docSnap = await getDoc(doc(db, 'users', userId));
+    if (docSnap.exists()) {
+      const bookmarks = docSnap.data().bookmarkedRestaurants || [];
+      return { bookmarks, error: null };
+    }
+    return { bookmarks: [], error: null };
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load bookmarked restaurants:', error);
+    return { bookmarks: [], error: error.message || 'Failed to load bookmarked restaurants' };
   }
 }
