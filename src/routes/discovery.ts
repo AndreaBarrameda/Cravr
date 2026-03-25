@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { mapsClient } from '../services/mapsClient';
 import { generateMatchReason, generateRestaurantMenu, GeneratedDish, generateRestaurantDescription, RestaurantDescription } from '../services/openaiClient';
 import { getFoodImage } from '../services/foodImageService';
+import { mapCravingToKeywords, getPrimaryKeyword } from '../services/cravingMapper';
 
 // Cache restaurants to avoid redundant Google Maps API calls
 interface CachedRestaurants {
@@ -12,8 +13,10 @@ interface CachedRestaurants {
 const restaurantCache = new Map<string, CachedRestaurants>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-function getCacheKey(lat: number, lng: number, cuisine?: string): string {
-  return `${lat.toFixed(4)}_${lng.toFixed(4)}_${cuisine || 'any'}`;
+function getCacheKey(lat: number, lng: number, cuisine?: string, craving?: string): string {
+  // Prioritize craving for cache key since that's what we search for
+  const searchTerm = (craving && craving.trim()) ? craving.toLowerCase() : (cuisine || 'any');
+  return `${lat.toFixed(4)}_${lng.toFixed(4)}_${searchTerm}`;
 }
 
 function getCachedRestaurants(lat: number, lng: number, cuisine?: string): any[] | null {
@@ -131,29 +134,92 @@ discoveryRouter.post('/restaurants', async (req, res) => {
     // Prioritize craving text over cuisine if both are provided
     let keyword = 'restaurant';
     if (craving_text && craving_text.trim()) {
-      keyword = craving_text.trim();
+      // Map the craving to proper cuisine keywords that Google Maps understands
+      keyword = getPrimaryKeyword(craving_text);
     } else if (cuisine && cuisine.trim()) {
       keyword = `${cuisine} restaurant`;
     }
 
-    const maps = await mapsClient.nearbySearch({
+    // eslint-disable-next-line no-console
+    console.log(`🔍 Craving: "${craving_text}" -> Mapped keyword: "${keyword}"`);
+
+    // Try initial search
+    let maps = await mapsClient.nearbySearch({
       lat: location.lat,
       lng: location.lng,
       radius: radius_meters,
       keyword
     });
 
-    const restaurants = maps.results ?? [];
+    let restaurants = maps.results ?? [];
+
+    // Filter restaurants to ensure they match the craving/keyword
+    // Check if restaurant's types include relevant categories
+    const relevantTypes = new Set(['restaurant', 'food', 'cafe', 'bakery', 'dessert', 'noodle', 'ramen', 'sushi', 'japanese', 'thai', 'indian', 'mexican', 'pizza', 'burger', 'seafood', 'chinese', 'korean', 'vietnamese', 'italian', 'breakfast', 'brunch']);
+
+    restaurants = restaurants.filter((r: any) => {
+      const types = (r.types ?? []).map((t: string) => t.toLowerCase());
+      // Must be a restaurant/food place
+      const isFood = types.some(t => relevantTypes.has(t) || t.includes('restaurant') || t.includes('cafe') || t.includes('food'));
+      return isFood;
+    });
+
+    // If we got very few results, expand search radius
+    if (restaurants.length < 10) {
+      // eslint-disable-next-line no-console
+      console.log(`📍 Got ${restaurants.length} results, expanding radius to get more`);
+      maps = await mapsClient.nearbySearch({
+        lat: location.lat,
+        lng: location.lng,
+        radius: Math.min(radius_meters * 2, 8000), // Double radius, max 8km
+        keyword
+      });
+      restaurants = (maps.results ?? []).filter((r: any) => {
+        const types = (r.types ?? []).map((t: string) => t.toLowerCase());
+        const isFood = types.some(t => relevantTypes.has(t) || t.includes('restaurant') || t.includes('cafe') || t.includes('food'));
+        return isFood;
+      });
+    }
+
+    // Helper function to calculate distance in km using Haversine formula
+    function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+      const R = 6371; // Earth's radius in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // Helper function to map Google Maps price_level to average peso price
+    function getPriceInPesos(priceLevel: number | undefined): number {
+      // Based on Google Maps price levels: 1=cheap, 2=moderate, 3=expensive, 4=very expensive
+      // Mapping to realistic Philippine restaurant prices
+      const priceMap: { [key: number]: number } = {
+        1: 250,    // Budget: ₱150-350
+        2: 450,    // Moderate: ₱350-550
+        3: 750,    // Expensive: ₱550-950
+        4: 1200    // Very Expensive: ₱950+
+      };
+      return priceMap[priceLevel || 2] || 450; // Default to moderate
+    }
 
     // Generate AI match reasons and descriptions for each restaurant
     const results = await Promise.all(
       restaurants.map(async (r: any) => {
-        const match_reason = await generateMatchReason(r.name, cuisine, r.rating || 4, r.price_level || 2);
+        // Use actual restaurant types from Google Maps, not the cuisine query
+        const restaurantTypes = (r.types ?? ['restaurant']).map((t: string) =>
+          t.replace(/_/g, ' ').charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)
+        );
+
+        const match_reason = await generateMatchReason(r.name, craving_text || cuisine || 'food', r.rating || 4, r.price_level || 2);
         const description = await generateRestaurantDescription(
           r.name,
-          r.types ?? ['restaurant'],
+          restaurantTypes,
           r.price_level ?? 2,
-          '',
+          craving_text || '',
           {},
           r.rating || 4.0,
           r.user_ratings_total || 0,
@@ -161,6 +227,18 @@ discoveryRouter.post('/restaurants', async (req, res) => {
           false, // website info not available in nearbySearch
           undefined // open status not available in nearbySearch
         );
+
+        // Calculate distance from user
+        let distanceMeters: number | null = null;
+        if (r.geometry?.location) {
+          const distanceKm = getDistanceKm(location.lat, location.lng, r.geometry.location.lat, r.geometry.location.lng);
+          distanceMeters = Math.round(distanceKm * 1000);
+          // eslint-disable-next-line no-console
+          console.log(`📍 ${r.name}: ${distanceMeters}m (${(distanceMeters/1000).toFixed(1)}km)`);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(`⚠️ No geometry for ${r.name}`, r.geometry);
+        }
 
         return {
           restaurant_id: `rst_${r.place_id}`,
@@ -171,9 +249,11 @@ discoveryRouter.post('/restaurants', async (req, res) => {
                 r.photos[0].photo_reference
               }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
             : null,
-          match_reason: description.tagline, // Use AI tagline instead of generic reason
+          distance_meters: distanceMeters,
+          match_reason: description.why_match, // Personalized reason why this matches user's craving
           rating: r.rating,
           price_level: r.price_level,
+          average_price_pesos: getPriceInPesos(r.price_level),
           vibe_tags: [],
           description: {
             tagline: description.tagline,
@@ -292,13 +372,28 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
     }
 
     // Check cache first to avoid redundant Google Maps API calls
-    let restaurants = getCachedRestaurants(location.lat, location.lng, cuisine);
+    // Use craving_text for cache key since that's what we actually search for
+    let restaurants = getCachedRestaurants(location.lat, location.lng, craving_text || cuisine);
 
     if (!restaurants) {
       // Cache miss - fetch from Google Maps
       // eslint-disable-next-line no-console
       console.log(`[Cache] Miss for ${cuisine} at ${location.lat},${location.lng} - fetching from Maps API`);
-      const keyword = cuisine ? `${cuisine} restaurant` : 'restaurant';
+
+      // Map craving text to proper keywords if available, otherwise use cuisine
+      let keyword = 'restaurant';
+      let keywordFallback: string | null = null;
+
+      if (craving_text && craving_text.trim()) {
+        const mappedKeywords = mapCravingToKeywords(craving_text);
+        keyword = mappedKeywords[0];
+        keywordFallback = mappedKeywords[1] || null;
+        // eslint-disable-next-line no-console
+        console.log(`🔍 Craving: "${craving_text}" -> Primary: "${keyword}", Fallback: "${keywordFallback}"`);
+      } else if (cuisine && cuisine.trim()) {
+        keyword = `${cuisine} restaurant`;
+      }
+
       const maps = await mapsClient.nearbySearch({
         lat: location.lat,
         lng: location.lng,
@@ -307,8 +402,22 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
       });
 
       restaurants = maps.results ?? [];
-      // Cache the results for 30 minutes
-      cacheRestaurants(location.lat, location.lng, cuisine, restaurants);
+
+      // If we got few results and have a fallback keyword, try that
+      if (restaurants.length < 8 && keywordFallback) {
+        // eslint-disable-next-line no-console
+        console.log(`🔍 Got only ${restaurants.length} results, trying fallback keyword: "${keywordFallback}"`);
+        const fallbackMaps = await mapsClient.nearbySearch({
+          lat: location.lat,
+          lng: location.lng,
+          radius: 8000,
+          keyword: keywordFallback
+        });
+        restaurants.push(...(fallbackMaps.results ?? []));
+      }
+
+      // Cache the results for 30 minutes (use craving_text for better cache key)
+      cacheRestaurants(location.lat, location.lng, craving_text || cuisine, restaurants);
     }
 
     restaurants = restaurants ?? [];
@@ -562,6 +671,174 @@ discoveryRouter.get('/restaurants/:place_id', async (req, res) => {
     // eslint-disable-next-line no-console
     console.error('Error fetching restaurant details:', err);
     return res.status(500).json({ error: 'Failed to fetch restaurant details' });
+  }
+});
+
+// NEW Trending endpoint - Get hottest restaurants in Cebu with engagement scoring
+// Featured restaurants for prototype (to be replaced with database later)
+const FEATURED_RESTAURANTS = [
+  'Din Tai Fung',
+  'Manam',
+  "Mo' Cookies",
+  'Ooma',
+  '8Cuts Burgers',
+  'House of Lechon',
+  'Tales and Feelings',
+  'Kaayoo The Filipino Kitchen',
+  'KUBU Restaurant + Bar'
+];
+
+discoveryRouter.post('/trending', async (req, res) => {
+  try {
+    const { location, limit = 20, category = 'all' } = req.body as {
+      location?: { lat?: number; lng?: number };
+      limit?: number;
+      category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest';
+    };
+
+    if (!location?.lat || !location?.lng) {
+      return res.status(400).json({ error: 'location.lat and location.lng are required' });
+    }
+
+    // Fetch restaurants near user using text search (more reliable than nearbySearch)
+    // eslint-disable-next-line no-console
+    console.log(`🔥 Trending search at ${location.lat}, ${location.lng} - Category: ${category}`);
+
+    // Different search queries based on category
+    let searchQueries: string[] = [];
+
+    if (category === 'garden') {
+      searchQueries = ['garden restaurant', 'outdoor dining', 'restaurant with garden', 'garden cafe'];
+    } else if (category === 'city-view') {
+      searchQueries = ['rooftop restaurant', 'restaurant with view', 'sky lounge', 'observation deck restaurant'];
+    } else if (category === 'cozy-cafes') {
+      searchQueries = ['cozy cafe', 'intimate restaurant', 'boutique cafe', 'charming cafe'];
+    } else if (category === 'fine-dining') {
+      searchQueries = ['fine dining', 'upscale restaurant', 'gourmet restaurant', 'michelin restaurant'];
+    } else if (category === 'newest') {
+      searchQueries = ['new restaurant', 'recently opened restaurant', 'trending restaurant', 'popular new place'];
+    } else {
+      searchQueries = [
+        'popular restaurants',
+        'best restaurants',
+        'restaurants',
+        'cafes and restaurants',
+        'food places'
+      ];
+    }
+
+    let restaurants: any[] = [];
+
+    for (const query of searchQueries) {
+      if (restaurants.length >= 5) break; // Stop if we already have enough results
+
+      // eslint-disable-next-line no-console
+      console.log(`🔥 Trying text search: "${query}"`);
+
+      try {
+        const maps = await mapsClient.textSearch({
+          query,
+          location,
+          radius: 3000
+        });
+
+        if (maps.results && maps.results.length > 0) {
+          restaurants = [...restaurants, ...maps.results];
+          // eslint-disable-next-line no-console
+          console.log(`🔥 Found ${maps.results.length} places for "${query}"`);
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.log(`🔥 Query "${query}" failed, trying next...`);
+      }
+    }
+
+    // Remove duplicates by place_id
+    const uniqueRestaurants = Array.from(
+      new Map(restaurants.map(r => [r.place_id, r])).values()
+    );
+
+    // eslint-disable-next-line no-console
+    console.log(`🔥 Total unique results after all queries: ${uniqueRestaurants.length}`);
+
+    // If still no results, return empty
+    if (uniqueRestaurants.length === 0) {
+      // eslint-disable-next-line no-console
+      console.log(`🔥 No restaurants found after all attempts`);
+      return res.json({
+        discovery_session_id: `dst_${Date.now()}`,
+        results: []
+      });
+    }
+
+    restaurants = uniqueRestaurants;
+
+    // Score restaurants by engagement + recency
+    const scoredRestaurants = restaurants.map((r: any) => {
+      // Engagement score: high ratings + lots of reviews
+      const rating = r.rating || 0;
+      const reviewCount = r.user_ratings_total || 0;
+
+      const ratingScore = rating / 5; // 0-1
+      const reviewScore = Math.min(reviewCount / 500, 1); // 0-1, normalize to 500 reviews
+      let engagementScore = (ratingScore * 0.6) + (reviewScore * 0.4); // 60% rating, 40% review count
+
+      // Boost featured restaurants
+      const isFeatured = FEATURED_RESTAURANTS.some(name => r.name?.includes(name));
+      if (isFeatured) {
+        engagementScore = Math.min(engagementScore + 0.3, 1); // Boost by 0.3, max 1.0
+      }
+
+      return {
+        ...r,
+        engagementScore,
+        isFeatured,
+        isNew: reviewCount < 30 && rating >= 4.0, // Newer with decent rating (4.0+)
+        isHottest: engagementScore > 0.75 && reviewCount >= 50 // High engagement + established
+      };
+    });
+
+    // Separate and sort: hottest first, then newest, then by engagement
+    const hottest = scoredRestaurants.filter((r: any) => r.isHottest);
+    const newest = scoredRestaurants.filter((r: any) => r.isNew && !r.isHottest);
+    const others = scoredRestaurants.filter((r: any) => !r.isHottest && !r.isNew);
+
+    // Sort each group by engagement score
+    hottest.sort((a: any, b: any) => b.engagementScore - a.engagementScore);
+    newest.sort((a: any, b: any) => b.engagementScore - a.engagementScore);
+    others.sort((a: any, b: any) => b.engagementScore - a.engagementScore);
+
+    // Combine: hottest first, then newest, then others
+    const topRestaurants = [...hottest, ...newest, ...others].slice(0, limit);
+
+    // Format response similar to other discovery endpoints
+    const results = topRestaurants.map((r: any) => ({
+      restaurant_id: `rst_${r.place_id}`,
+      place_id: r.place_id,
+      name: r.name,
+      hero_photo_url: r.photos?.[0]
+        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${
+            r.photos[0].photo_reference
+          }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
+        : null,
+      rating: r.rating || 0,
+      price_level: r.price_level || 2,
+      review_count: r.user_ratings_total || 0,
+      isNew: r.isNew,
+      isHottest: r.isHottest,
+      isFeatured: r.isFeatured,
+      engagement_score: Number(r.engagementScore.toFixed(2)),
+      vibe_tags: r.types?.slice(0, 3) || []
+    }));
+
+    return res.json({
+      discovery_session_id: `dst_${Date.now()}`,
+      results
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching trending restaurants:', err);
+    return res.status(500).json({ error: 'Failed to fetch trending restaurants' });
   }
 });
 

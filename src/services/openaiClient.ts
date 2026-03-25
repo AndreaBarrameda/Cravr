@@ -213,7 +213,8 @@ Based on THESE ACTUAL DETAILS about the restaurant, generate personalized respon
    - Include: rating quality + cuisine + ONE unique trait (popularity, establishment, price, specialty)
    - Examples: "Hidden gem Vietnamese spot, new but highly-rated" OR "Established Thai favorite (400+ reviews), consistent quality"
 2. atmosphere: 1-2 sentence description of the restaurant's likely vibe based on its profile
-3. why_match: 1-2 sentences explaining why this specific restaurant is perfect for the user's craving/preferences
+3. why_match: 1 SHORT sentence (max 10 words) explaining why this matches the user's craving - be punchy and direct
+   - Examples: "Perfect ramen spot for noodle lovers" OR "Authentic Japanese flavors, your craving fulfilled"
 4. vibe: 1 short sentence capturing the restaurant's essence
 5. best_for: Who would enjoy this restaurant most based on its characteristics
 6. suggested_dishes: 3-5 specific, realistic dish names for THIS cuisine type
@@ -408,15 +409,22 @@ export async function generateFollowupQuestions(cravingText: string, cuisine: st
 
   try {
     const prompt = `
-You are part of a craving-first food discovery app. Based on the user's craving and selected cuisine, generate exactly 2 follow-up questions to refine their taste preferences.
+You are part of a craving-first food discovery app. Based on the user's craving, generate exactly 2 follow-up questions that help refine their desire in concrete, sensory ways.
 
 User craving: "${cravingText}"
-Selected cuisine: ${cuisine}
+Cuisine context: ${cuisine}
 
-Generate 2 contextual questions that will help narrow down what they want. Each question should have exactly 2 button options.
+Generate 2 SPECIFIC, SENSORY follow-up questions that drill down into WHAT TYPE of "${cravingText}" they want. Questions should:
+1. Ask about SPECIFIC SUBTYPES (e.g., if "sweet" → "Chocolate or Fruit?", "Cake or Ice Cream?")
+2. Ask about SENSATIONS (temperature, texture, intensity)
+3. Ask about OCCASION or VIBE they're after
+4. Be concrete and visual, not abstract
 
-For each option, provide attribute mappings (use only relevant fields: temperature, flavor, texture, intensity, occasion, budget).
-Valid values:
+Make questions feel natural and conversational, like a friend asking "wait, like what kind of ${cravingText}?"
+
+Each question must have exactly 2 distinct button options. For each option, map to relevant attributes.
+
+Valid attribute values:
 - temperature: "hot" | "cold" | "room"
 - flavor: "savory" | "sweet" | "spicy" | "umami" | "sour"
 - texture: "brothy" | "soft" | "crunchy" | "creamy" | "chewy"
