@@ -352,9 +352,22 @@ export function TrendingScreen({ navigation }: Props) {
           });
         }}
       >
+        <View style={styles.smallCardImageContainer}>
+          {item.hero_photo_url ? (
+            <Image
+              source={{ uri: item.hero_photo_url }}
+              style={styles.smallCardImage}
+            />
+          ) : (
+            <View style={[styles.smallCardImage, styles.smallCardImagePlaceholder]}>
+              <Text style={styles.smallCardImagePlaceholderText}>🍽️</Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.smallCardContent}>
           <View style={styles.smallCardInfo}>
-            <Text style={styles.smallCardName}>{item.name}</Text>
+            <Text style={styles.smallCardName} numberOfLines={2}>{item.name}</Text>
             <Text style={styles.smallCardMeta}>
               {item.rating.toFixed(1)} ★ •{'$'.repeat(item.price_level || 1)}
               {item.distance_meters && (
@@ -850,31 +863,49 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: tokens.spacing.xl,
     marginBottom: tokens.spacing.xxxl,
-    marginTop: tokens.spacing.xl
+    marginTop: tokens.spacing.xxl
   },
   sectionTitle: {
     ...tokens.typography.label,
     color: tokens.colors.textPrimary,
     marginBottom: tokens.spacing.xl,
-    fontSize: 13,
-    letterSpacing: 0.5,
-    fontWeight: '700'
+    fontSize: 14,
+    letterSpacing: 0.8,
+    fontWeight: '800',
+    textTransform: 'uppercase'
   },
   smallCard: {
     backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.md,
-    padding: tokens.spacing.lg,
+    borderRadius: tokens.radius.lg,
     marginBottom: tokens.spacing.lg,
     borderWidth: 1,
     borderColor: tokens.colors.border,
     ...tokens.shadows.sm,
-    minHeight: 70
+    overflow: 'hidden'
+  },
+  smallCardImageContainer: {
+    width: '100%',
+    height: 150,
+    backgroundColor: '#E8E8E8'
+  },
+  smallCardImage: {
+    width: '100%',
+    height: '100%'
+  },
+  smallCardImagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: tokens.colors.primaryTint
+  },
+  smallCardImagePlaceholderText: {
+    fontSize: 40
   },
   smallCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: tokens.spacing.md
+    gap: tokens.spacing.md,
+    padding: tokens.spacing.lg
   },
   smallCardInfo: {
     flex: 1
@@ -886,15 +917,17 @@ const styles = StyleSheet.create({
     flexShrink: 0
   },
   smallCardName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.xs
+    marginBottom: tokens.spacing.sm,
+    lineHeight: 22
   },
   smallCardMeta: {
     fontSize: 13,
     color: tokens.colors.textSecondary,
-    fontWeight: '500'
+    fontWeight: '500',
+    lineHeight: 18
   },
   smallBookmarkButton: {
     width: 40,
@@ -921,11 +954,12 @@ const styles = StyleSheet.create({
     color: tokens.colors.textInverse
   },
   subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: tokens.colors.primary,
-    marginBottom: tokens.spacing.md,
-    marginTop: tokens.spacing.lg
+    marginBottom: tokens.spacing.lg,
+    marginTop: tokens.spacing.xl,
+    letterSpacing: 0.3
   },
   michelinCard: {
     backgroundColor: tokens.colors.backgroundLight,

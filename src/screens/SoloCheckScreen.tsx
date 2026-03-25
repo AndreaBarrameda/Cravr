@@ -5,12 +5,15 @@ import { DiscoverStackParamList } from '../../App';
 import { ScreenContainer } from '../components/UI';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
+import { useTheme } from '../theme/useTheme';
+import { tokens } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'SoloCheck'>;
 
 export function SoloCheckScreen({ route, navigation }: Props) {
   const { restaurantId, dishId, cravingId, cuisine } = route.params;
   const { setState } = useAppState();
+  const { theme } = useTheme();
 
   const goReservation = (diningMode: 'solo' | 'group') => {
     navigation.navigate('Reservation', {
@@ -46,60 +49,117 @@ export function SoloCheckScreen({ route, navigation }: Props) {
 
   return (
     <ScreenContainer>
-      <Text style={styles.title}>Are you dining solo tonight?</Text>
+      <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Are you dining solo tonight?</Text>
+      <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>Choose how you'd like to dine</Text>
 
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.option} onPress={() => goReservation('group')}>
-          <Text style={styles.optionTitle}>No, booking for me/us</Text>
-          <Text style={styles.optionText}>Skip Crave Connect and go straight to booking.</Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity style={styles.option} onPress={goCraveConnect}>
-          <Text style={styles.optionTitle}>Yes, Crave Connect</Text>
-          <Text style={styles.optionText}>
-            See solo diners with similar cravings near you. Food-first, not dating.
+      {/* Booking Solo */}
+      <TouchableOpacity
+        style={[styles.optionCard, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}
+        onPress={() => goReservation('group')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.optionIconContainer}>
+          <Text style={styles.optionIcon}>🍽️</Text>
+        </View>
+        <View style={styles.optionContent}>
+          <Text style={[styles.optionTitle, { color: theme.colors.textPrimary }]}>Just booking</Text>
+          <Text style={[styles.optionText, { color: theme.colors.textSecondary }]}>
+            Skip straight to making a reservation
           </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+        <Text style={styles.optionArrow}>→</Text>
+      </TouchableOpacity>
+
+      {/* Crave Connect */}
+      <TouchableOpacity
+        style={[styles.optionCardPrimary, { backgroundColor: tokens.colors.primary }]}
+        onPress={goCraveConnect}
+        activeOpacity={0.85}
+      >
+        <View style={styles.optionIconContainerPrimary}>
+          <Text style={styles.optionIcon}>👥</Text>
+        </View>
+        <View style={styles.optionContent}>
+          <Text style={[styles.optionTitle, { color: tokens.colors.textInverse }]}>Connect with others</Text>
+          <Text style={[styles.optionText, { color: 'rgba(255,255,255,0.85)' }]}>
+            Meet solo diners with your cravings nearby
+          </Text>
+        </View>
+        <Text style={[styles.optionArrow, { color: tokens.colors.textInverse }]}>→</Text>
+      </TouchableOpacity>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#161616',
-    marginBottom: 24
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: tokens.spacing.sm,
+    letterSpacing: -0.5
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4
+  subtitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: tokens.spacing.xxxl,
+    opacity: 0.7
   },
-  option: {
-    paddingVertical: 4
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
+    borderWidth: 1,
+    ...tokens.shadows.sm
+  },
+  optionCardPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
+    ...tokens.shadows.md
+  },
+  optionIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 106, 42, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: tokens.spacing.lg
+  },
+  optionIconContainerPrimary: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: tokens.spacing.lg
+  },
+  optionIcon: {
+    fontSize: 28
+  },
+  optionContent: {
+    flex: 1
   },
   optionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4
+    fontWeight: '700',
+    marginBottom: tokens.spacing.xs,
+    lineHeight: 22
   },
   optionText: {
-    fontSize: 14,
-    color: '#6B6B6B'
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3E4DA',
-    marginVertical: 16
+  optionArrow: {
+    fontSize: 20,
+    color: tokens.colors.primary,
+    marginLeft: tokens.spacing.md
   }
 });
 
