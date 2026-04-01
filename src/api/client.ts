@@ -6,6 +6,13 @@ const API_ORIGIN =
   process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:4000';
 const BASE_URL = `${API_ORIGIN}/api`;
 
+export type TasteProfileInput = {
+  liked_dishes: string[];
+  favorite_keywords: string[];
+  favorite_cuisines: string[];
+  search_history: string[];
+};
+
 async function request(path: string, options?: RequestInit) {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
@@ -40,6 +47,7 @@ export const api = {
     cuisine: string;
     lat: number;
     lng: number;
+    taste_profile_input?: TasteProfileInput;
     timeOfDay?: string;
     weather?: { temperature: number; condition: string };
   }) {
@@ -49,6 +57,7 @@ export const api = {
         craving_id: params.craving_id,
         craving_text: params.craving_text,
         cuisine: params.cuisine,
+        taste_profile_input: params.taste_profile_input,
         location: { lat: params.lat, lng: params.lng },
         radius_meters: 3000,
         context: {
@@ -62,13 +71,15 @@ export const api = {
   getTrendingRestaurants(params: {
     lat: number;
     lng: number;
+    taste_profile_input?: TasteProfileInput;
     limit?: number;
-    category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest';
+    category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest' | 'mall-food' | 'quick-bites';
   }) {
     return request('/discovery/trending', {
       method: 'POST',
       body: JSON.stringify({
         location: { lat: params.lat, lng: params.lng },
+        taste_profile_input: params.taste_profile_input,
         limit: params.limit || 10,
         category: params.category || 'all'
       })
@@ -98,6 +109,7 @@ export const api = {
   discoverDishesByAttributes(params: {
     craving_text: string;
     cuisine: string;
+    real_only?: boolean;
     attributes: {
       temperature: string | null;
       flavor: string | null;
@@ -113,6 +125,7 @@ export const api = {
       body: JSON.stringify({
         craving_text: params.craving_text,
         cuisine: params.cuisine,
+        real_only: params.real_only ?? false,
         attributes: params.attributes,
         location: params.location
       })
@@ -163,4 +176,3 @@ export const api = {
     return request('/discovery/michelin');
   }
 };
-

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { getTimeOfDay, getWeatherData, type WeatherData } from '../utils/contextual';
 import { tokens } from '../theme/tokens';
 import { useAppState } from '../state/AppStateContext';
@@ -32,25 +33,25 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
 
   if (!weather || !timeOfDay) return null;
 
-  const getWeatherEmoji = () => {
-    if (weather.condition === 'rainy') return '🌧️';
-    if (weather.condition === 'snowy') return '❄️';
-    if (weather.condition === 'cloudy' || weather.condition === 'foggy') return '☁️';
-    if (weather.temperature > 28) return '☀️';
-    return '🌤️';
+  const getWeatherIcon = () => {
+    if (weather.condition === 'rainy') return 'rainy-outline';
+    if (weather.condition === 'snowy') return 'snow-outline';
+    if (weather.condition === 'cloudy' || weather.condition === 'foggy') return 'cloudy-outline';
+    if (weather.temperature > 28) return 'sunny-outline';
+    return 'partly-sunny-outline';
   };
 
-  const getTimeEmoji = () => {
-    if (timeOfDay === 'breakfast') return '🌅';
-    if (timeOfDay === 'lunch') return '☀️';
-    if (timeOfDay === 'dinner') return '🌙';
-    return '⭐';
+  const getTimeIcon = () => {
+    if (timeOfDay === 'breakfast') return 'partly-sunny-outline';
+    if (timeOfDay === 'lunch') return 'sunny-outline';
+    if (timeOfDay === 'dinner') return 'moon-outline';
+    return 'star-outline';
   };
 
   if (compact) {
     return (
       <View style={styles.compactContainer}>
-        <Text style={styles.compactEmoji}>{getWeatherEmoji()}</Text>
+        <Ionicons name={getWeatherIcon() as any} size={16} color={tokens.colors.primary} />
         <Text style={styles.compactText}>{weather.temperature}°</Text>
         <Text style={styles.compactTime}>{timeOfDay}</Text>
       </View>
@@ -60,7 +61,7 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
   return (
     <View style={styles.container}>
       <View style={styles.leftSection}>
-        <Text style={styles.weatherEmoji}>{getWeatherEmoji()}</Text>
+        <Ionicons name={getWeatherIcon() as any} size={26} color={tokens.colors.primary} />
         <View style={styles.weatherInfo}>
           <Text style={styles.temperature}>{weather.temperature}°C</Text>
           <Text style={styles.condition}>{weather.condition}</Text>
@@ -70,10 +71,13 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
       <View style={styles.divider} />
 
       <View style={styles.rightSection}>
-        <Text style={styles.timeEmoji}>{getTimeEmoji()}</Text>
+        <Ionicons name={getTimeIcon() as any} size={26} color={tokens.colors.primary} />
         <View style={styles.timeInfo}>
           <Text style={styles.timeLabel}>{timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)}</Text>
-          <Text style={styles.humidity}>💧 {weather.humidity}%</Text>
+          <View style={styles.humidityRow}>
+            <Ionicons name="water-outline" size={12} color={tokens.colors.textSecondary} />
+            <Text style={styles.humidity}> {weather.humidity}%</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -105,9 +109,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end'
   },
-  weatherEmoji: {
-    fontSize: 28
-  },
   weatherInfo: {
     justifyContent: 'center'
   },
@@ -127,9 +128,6 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.border,
     marginHorizontal: tokens.spacing.md
   },
-  timeEmoji: {
-    fontSize: 28
-  },
   timeInfo: {
     justifyContent: 'center'
   },
@@ -142,6 +140,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: tokens.colors.textSecondary
   },
+  humidityRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
 
   // Compact version
   compactContainer: {
@@ -153,9 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.primaryTint,
     borderRadius: tokens.radius.md,
     marginRight: tokens.spacing.md
-  },
-  compactEmoji: {
-    fontSize: 16
   },
   compactText: {
     fontSize: 12,

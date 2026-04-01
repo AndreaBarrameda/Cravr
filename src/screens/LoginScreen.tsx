@@ -46,7 +46,7 @@ export function LoginScreen({ navigation }: Props) {
         isAuthenticated: true,
         authUser: user,
         userProfile: {
-          name: user.name || user.email
+          name: user.name || user.email || 'Cravr User'
         }
       }));
 
@@ -69,6 +69,7 @@ export function LoginScreen({ navigation }: Props) {
               ...prev,
               userProfile: {
                 ...prev.userProfile,
+                name: prev.userProfile?.name || user.name || user.email || 'Cravr User',
                 favoriteCuisine: preferences.favoriteCuisine,
                 favoriteFood: preferences.favoriteFood
               },

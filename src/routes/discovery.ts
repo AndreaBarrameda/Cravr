@@ -3,6 +3,7 @@ import { mapsClient } from '../services/mapsClient';
 import { generateMatchReason, generateRestaurantMenu, GeneratedDish, generateRestaurantDescription, RestaurantDescription } from '../services/openaiClient';
 import { getFoodImage } from '../services/foodImageService';
 import { mapCravingToKeywords, getPrimaryKeyword } from '../services/cravingMapper';
+import { getRealMenuItems } from '../services/realMenuService';
 
 // Cache restaurants to avoid redundant Google Maps API calls
 interface CachedRestaurants {
@@ -87,6 +88,36 @@ function cacheMenu(id: string, dishes: GeneratedDish[]): void {
   console.log(`[Menu Cache] Stored ${dishes.length} dishes for ${id}`);
 }
 
+function inferDishTraits(name: string, description: string) {
+  const text = `${name} ${description}`.toLowerCase();
+
+  const temperature =
+    /salad|halo-halo|iced|cold|sashimi|ceviche/.test(text) ? 'cold'
+      : /room temp|ambient/.test(text) ? 'room'
+        : 'hot';
+
+  const flavor =
+    /sweet|dessert|caramel|honey|banana|chocolate/.test(text) ? 'sweet'
+      : /spicy|chili|sili|bicol/.test(text) ? 'spicy'
+        : /sour|sinigang|ceviche|vinegar/.test(text) ? 'sour'
+          : /umami|miso|mushroom|truffle/.test(text) ? 'umami'
+            : 'savory';
+
+  const texture =
+    /crispy|crunch|fried|tempura/.test(text) ? 'crunchy'
+      : /creamy|carbonara|sauce/.test(text) ? 'creamy'
+        : /broth|soup|ramen|sinigang/.test(text) ? 'brothy'
+          : /chewy|noodle|pasta/.test(text) ? 'chewy'
+            : 'soft';
+
+  const intensity =
+    /extra spicy|fiery|very spicy/.test(text) ? 'intense'
+      : /spicy|pepper|bold/.test(text) ? 'medium'
+        : 'mild';
+
+  return { temperature, flavor, texture, intensity };
+}
+
 function getCachedDescription(id: string): RestaurantDescription | null {
   const cached = descriptionCache.get(id);
 
@@ -113,6 +144,18 @@ function cacheDescription(id: string, description: RestaurantDescription): void 
 }
 
 export const discoveryRouter = Router();
+
+function hasMeaningfulAttributes(attributes?: {
+  temperature: string | null;
+  flavor: string | null;
+  texture: string | null;
+  intensity: string | null;
+  occasion: string | null;
+  budget: string | null;
+}): boolean {
+  if (!attributes) return false;
+  return Object.values(attributes).some((value) => value !== null);
+}
 
 discoveryRouter.post('/restaurants', async (req, res) => {
   try {
@@ -302,6 +345,36 @@ discoveryRouter.post('/dishes', async (req, res) => {
 
     const place = details.result;
 
+    const realMenuItems = await getRealMenuItems({
+      placeId,
+      website: place.website,
+      priceLevel: place.price_level ?? 2
+    });
+
+    if (realMenuItems.length > 0) {
+      const results = realMenuItems.slice(0, 12).map((item, idx) => ({
+        dish_id: `real_${placeId}_${item.name.replace(/\s+/g, '_')}`,
+        name: item.name,
+        description: item.description,
+        photo_url: item.photo_url,
+        restaurant_photo_url: place.photos?.[idx % (place.photos?.length || 1)]
+          ? `${'https://maps.googleapis.com/maps/api/place/photo'}?maxwidth=400&photoreference=${
+              place.photos![idx % place.photos!.length].photo_reference
+            }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
+          : null,
+        photo_source: item.photo_url ? 'dish' : 'restaurant',
+        price: item.price,
+        match_score: 0.95 - (idx * 0.03),
+        data_source: 'real_menu'
+      }));
+
+      return res.json({
+        restaurant_id,
+        restaurant_name: place.name,
+        results
+      });
+    }
+
     // Check menu cache first
     let generatedDishes = getCachedMenu(restaurant_id);
 
@@ -322,17 +395,19 @@ discoveryRouter.post('/dishes', async (req, res) => {
     // Map generated dishes to response shape
     const mockMenuItems = await Promise.all(
       generatedDishes.map(async (dish, idx) => {
-        const photoUrl = await getFoodImage(dish.name) ??
-          (place.photos?.[idx % (place.photos?.length || 1)]
-            ? `${'https://maps.googleapis.com/maps/api/place/photo'}?maxwidth=400&photoreference=${
-                place.photos![idx % place.photos!.length].photo_reference
-              }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
-            : null);
+        const foodPhotoUrl = await getFoodImage(dish.name);
+        const restaurantPhotoUrl = place.photos?.[idx % (place.photos?.length || 1)]
+          ? `${'https://maps.googleapis.com/maps/api/place/photo'}?maxwidth=400&photoreference=${
+              place.photos![idx % place.photos!.length].photo_reference
+            }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
+          : null;
         return {
           dish_id: `dsh_${placeId}_${dish.name.replace(/\s+/g, '_')}`,
           name: dish.name,
           description: dish.description,
-          photo_url: photoUrl,
+          photo_url: foodPhotoUrl,
+          restaurant_photo_url: restaurantPhotoUrl,
+          photo_source: foodPhotoUrl ? 'dish' : restaurantPhotoUrl ? 'restaurant' : 'none',
           price: dish.price,
           match_score: 0.9 - (idx * 0.05) // Slight decrease for lower-ranked dishes
         };
@@ -356,6 +431,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
     const { craving_text, cuisine, attributes, location } = req.body as {
       craving_text?: string;
       cuisine?: string;
+      real_only?: boolean;
       attributes?: {
         temperature: string | null;
         flavor: string | null;
@@ -366,6 +442,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
       };
       location?: { lat?: number; lng?: number };
     };
+    const realOnly = Boolean((req.body as { real_only?: boolean }).real_only);
 
     if (!location?.lat || !location?.lng) {
       return res.status(400).json({ error: 'location is required' });
@@ -451,18 +528,21 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
       return 0;
     }
 
+    const hasActiveAttributes = hasMeaningfulAttributes(attributes);
+    const hasSpecificCravingText = Boolean(craving_text && craving_text.trim() && craving_text.trim().toLowerCase() !== 'popular dishes');
+
     // Shuffle restaurants to provide variety even with cached results
     // This ensures different requests return different restaurants/dishes
     const shuffled = [...restaurants].sort(() => Math.random() - 0.5);
-    // Select top 8 restaurants for faster menu generation
-    const selectedRestaurants = shuffled.slice(0, Math.min(8, shuffled.length));
+    // Select more restaurants so swipe-style surfaces have a deeper pool
+    const selectedRestaurants = shuffled.slice(0, Math.min(12, shuffled.length));
 
     // eslint-disable-next-line no-console
-    console.log(`[Dishes] Selected ${selectedRestaurants.length} restaurants from ${restaurants.length} cached results. Processing up to 8 in parallel...`);
+    console.log(`[Dishes] Selected ${selectedRestaurants.length} restaurants from ${restaurants.length} cached results. Processing up to 12 in parallel...`);
 
-    // Process restaurants in parallel (limit to 8 at a time to avoid overwhelming the API)
+    // Process restaurants in parallel (limit to 12 at a time to avoid overwhelming the API)
     const allDishes: any[] = [];
-    const processLimit = Math.min(8, selectedRestaurants.length);
+    const processLimit = Math.min(12, selectedRestaurants.length);
 
     for (let i = 0; i < selectedRestaurants.length; i += processLimit) {
       const batch = selectedRestaurants.slice(i, i + processLimit);
@@ -470,6 +550,67 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
       const batchResults = await Promise.all(
         batch.map(async (r: any) => {
           const restaurantId = `rst_${r.place_id}`;
+          const details = realOnly ? await mapsClient.placeDetails(r.place_id) : null;
+          const website = details?.result?.website || r.website;
+          const photoCollection = details?.result?.photos || r.photos;
+          const restaurantTypes = details?.result?.types || r.types;
+
+          const realMenuItems = await getRealMenuItems({
+            placeId: r.place_id,
+            website,
+            priceLevel: r.price_level ?? 2
+          });
+
+          if (realMenuItems.length > 0) {
+            const scoredRealItems = realMenuItems
+              .map((item) => {
+                let matchScore = 0;
+                const cravingMatch = getCravingMatchScore(item.name, craving_text ?? '');
+                if (cravingMatch > 0) {
+                  matchScore += cravingMatch * 0.5;
+                }
+
+                const inferred = inferDishTraits(item.name, item.description);
+                if (attributes?.temperature === inferred.temperature) matchScore += 0.12;
+                if (attributes?.flavor === inferred.flavor) matchScore += 0.12;
+                if (attributes?.texture === inferred.texture) matchScore += 0.12;
+                if (attributes?.intensity === inferred.intensity) matchScore += 0.08;
+
+                if (!hasSpecificCravingText && !hasActiveAttributes && matchScore === 0) {
+                  const ratingBoost = Math.max(0, ((r.rating || 4.0) - 3.5) * 0.12);
+                  const popularityBoost = Math.min((r.user_ratings_total || 0) / 5000, 0.12);
+                  matchScore = 0.55 + ratingBoost + popularityBoost;
+                }
+
+                return {
+                  dish_id: `real_${r.place_id}_${item.name.replace(/\s+/g, '_')}`,
+                  name: item.name,
+                  description: item.description,
+                  photo_url: item.photo_url,
+                  restaurant_photo_url: photoCollection?.[0]
+                    ? `${'https://maps.googleapis.com/maps/api/place/photo'}?maxwidth=400&photoreference=${
+                        photoCollection[0].photo_reference
+                      }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
+                    : null,
+                  photo_source: item.photo_url ? 'dish' : 'restaurant',
+                  price: item.price,
+                  restaurant_id: restaurantId,
+                  restaurant_name: r.name,
+                  rating: r.rating || 4.0,
+                  match_score: Math.min(matchScore, 1.0),
+                  match_reason: 'Real menu item from the restaurant website',
+                  data_source: 'real_menu'
+                };
+              })
+              .sort((a, b) => b.match_score - a.match_score)
+              .slice(0, 8);
+
+            return scoredRealItems;
+          }
+
+          if (realOnly) {
+            return [];
+          }
 
           // Check menu cache first
           let generatedDishes = getCachedMenu(restaurantId);
@@ -480,7 +621,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
             console.log(`[Menu Cache] Miss for ${restaurantId} - generating menu`);
             generatedDishes = await generateRestaurantMenu(
               r.name,
-              r.types ?? ['restaurant'],
+              restaurantTypes ?? ['restaurant'],
               r.price_level ?? 2,
               craving_text ?? '',
               attributes ?? {}
@@ -497,7 +638,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
             console.log(`[Description Cache] Miss for ${restaurantId} - generating description`);
             restaurantDescription = await generateRestaurantDescription(
               r.name,
-              r.types ?? ['restaurant'],
+              restaurantTypes ?? ['restaurant'],
               r.price_level ?? 2,
               craving_text ?? '',
               attributes ?? {},
@@ -535,13 +676,21 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
             if (attributes?.occasion === 'date' && ['Sushi', 'Grilled Fish', 'Salmon', 'Premium', 'Steak'].some(kw => dish.name.includes(kw))) matchScore += 0.05;
             if (attributes?.occasion === 'group' && ['Hot Pot', 'BBQ', 'Curry', 'Buffet', 'Sharing'].some(kw => dish.name.includes(kw))) matchScore += 0.05;
 
+            // Broad swipe discovery should still show a non-zero confidence score
+            // based on the restaurant quality when there is no strong craving input.
+            if (!hasSpecificCravingText && !hasActiveAttributes && matchScore === 0) {
+              const ratingBoost = Math.max(0, ((r.rating || 4.0) - 3.5) * 0.12);
+              const popularityBoost = Math.min((r.user_ratings_total || 0) / 5000, 0.12);
+              matchScore = 0.48 + ratingBoost + popularityBoost;
+            }
+
             return {
               ...dish,
               matchScore: Math.min(matchScore, 1.0) // Cap at 1.0
             };
           })
             .sort((a, b) => b.matchScore - a.matchScore)
-            .slice(0, 5); // Top 5 dishes per restaurant
+            .slice(0, 8); // Keep more dishes per restaurant for larger swipe decks
 
           // Create dish entries for this restaurant
           const restaurantDishes = await Promise.all(
@@ -557,7 +706,9 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                 dish_id: `dsh_${r.place_id}_${dish.name.replace(/\s+/g, '_')}`,
                 name: dish.name,
                 description: dish.description,
-                photo_url: foodImageUrl ?? fallbackUrl,
+                photo_url: foodImageUrl,
+                restaurant_photo_url: fallbackUrl,
+                photo_source: foodImageUrl ? 'dish' : fallbackUrl ? 'restaurant' : 'none',
                 price: dish.price,
                 restaurant_id: restaurantId,
                 restaurant_name: r.name,
@@ -597,7 +748,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
     // Get top candidates, then shuffle with bias toward higher scores for variety
     const topCandidates = uniqueDishes
       .sort((a, b) => b.match_score - a.match_score)
-      .slice(0, 40); // Get top 40 candidates
+      .slice(0, 80); // Keep a broader candidate pool before weighted shuffle
 
     // Weighted shuffle: add randomness but keep quality high
     // This ensures different requests get different dishes while maintaining good matches
@@ -612,7 +763,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
         return bScore - aScore;
       })
       .map(({ randomBoost, ...dish }) => dish) // Remove randomBoost from result
-      .slice(0, 25);
+      .slice(0, 50);
 
     return res.json({
       discovery_session_id: `dsa_${Date.now()}`,
@@ -673,7 +824,6 @@ discoveryRouter.get('/restaurants/:place_id', async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch restaurant details' });
   }
 });
-
 // NEW Trending endpoint - Get hottest restaurants in Cebu with engagement scoring
 // Featured restaurants for prototype (to be replaced with database later)
 const FEATURED_RESTAURANTS = [
@@ -841,4 +991,3 @@ discoveryRouter.post('/trending', async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch trending restaurants' });
   }
 });
-

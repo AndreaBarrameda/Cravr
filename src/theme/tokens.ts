@@ -23,6 +23,7 @@ export const tokens = {
     textPrimary: '#0F0F0F',
     textSecondary: '#737373',
     textTertiary: '#A0A0A0',
+    textHeading: '#1A1A1A',
     textInverse: '#FFFFFF',
 
     border: '#F0EDEA',

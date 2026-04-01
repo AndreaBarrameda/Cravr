@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
@@ -11,14 +11,18 @@
     "jsx": "react-native"
   },
   "include": [
+    "App.tsx",
     "src"
   ],
   "exclude": [
-    "src/screens/**",
-    "src/components/**",
-    "src/state/**",
-    "src/api/**",
-    "src/theme/**",
-    "src/utils/**"
-  ]
+    "dist",
+    "src/index.ts",
+    "src/config/env.ts",
+    "src/routes/**",
+    "src/services/openaiClient.ts",
+    "src/services/mapsClient.ts",
+    "src/services/foodImageService.ts",
+    "src/screens/DiscoveryDashboardScreen.tsx"
+  ],
+  "extends": "expo/tsconfig.base"
 }

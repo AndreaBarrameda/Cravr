@@ -16,6 +16,7 @@ import { useAppState } from '../state/AppStateContext';
 import { getTimeOfDay, getWeatherData } from '../utils/contextual';
 import { generateMatchExplanation } from '../utils/explanations';
 import { calculateHaversineDistance } from '../utils/distance';
+import { buildTasteProfileInput } from '../utils/tasteProfile';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'RestaurantDiscovery'>;
 
@@ -26,6 +27,7 @@ type RestaurantCard = {
   distance_meters: number | null;
   rating: number;
   price_level: number;
+  average_price_pesos?: number | null;
   vibe_tags: string[];
   match_reason?: string;
 };
@@ -65,6 +67,7 @@ export function RestaurantDiscoveryScreen({ route, navigation }: Props) {
           cuisine,
           lat,
           lng,
+          taste_profile_input: buildTasteProfileInput(state),
           timeOfDay,
           weather: weatherData || undefined
         });
@@ -266,4 +269,3 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   }
 });
-

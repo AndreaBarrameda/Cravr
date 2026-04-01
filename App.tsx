@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { Text } from 'react-native';
 import { tokens } from './src/theme/tokens';
-import { HomeIcon, DiscoverIcon, TrendingIcon, ProfileIcon } from './src/components/Icons';
+import { HomeIcon, DiscoverIcon, TrendingIcon, ProfileIcon, ConnectIcon, BookmarkIcon, SwipeIcon } from './src/components/Icons';
 import { SplashCravingScreen } from './src/screens/SplashCravingScreen';
 import { CuisineSelectionScreen } from './src/screens/CuisineSelectionScreen';
 import { RestaurantDiscoveryScreen } from './src/screens/RestaurantDiscoveryScreen';
@@ -21,25 +21,30 @@ import { OnboardingWelcomeScreen } from './src/screens/OnboardingWelcomeScreen';
 import { OnboardingProfileScreen } from './src/screens/OnboardingProfileScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { SignUpScreen } from './src/screens/SignUpScreen';
+import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { DishDiscoveryScreen } from './src/screens/DishDiscoveryScreen';
 import { TrendingScreen } from './src/screens/TrendingScreen';
 import { TrendingFeedScreen } from './src/screens/TrendingFeedScreen';
+import { GroupDiningScreen } from './src/screens/GroupDiningScreen';
+import { SwipeDishesScreen } from './src/screens/SwipeDishesScreen';
+import { TasteAttributesScreen } from './src/screens/TasteAttributesScreen';
 import { AppStateProvider, useAppState } from './src/state/AppStateContext';
 
 export type TabParamList = {
-  Home: undefined;
-  Discover: undefined;
+  Discovery: undefined;
   Trending: undefined;
-  Profile: undefined;
+  Swipe: undefined;
+  Plans: undefined;
+  Bookmarks: undefined;
 };
 
 export type DiscoverStackParamList = {
   DiscoverHome: undefined;
   SplashCraving: undefined;
-  CuisineSelection: { cravingId: string };
+  CuisineSelection: { cravingId: string; cravingText?: string };
   RestaurantDiscovery: { cravingId: string; cravingText?: string; cuisine: string };
   RestaurantDetail: { restaurantId: string; cravingId: string; cuisine: string; dishId?: string };
   DishDiscovery: { cravingId: string; cuisine: string; attributes: { temperature: string | null; flavor: string | null; texture: string | null; intensity: string | null; occasion: string | null; budget: string | null }; craving_text?: string };
@@ -72,12 +77,18 @@ export type TrendingStackParamList = {
 export type RootStackParamList = {
   Login: undefined;
   SignUp: undefined;
+  ResetPassword: { email: string };
   MainTabs: undefined;
   OnboardingWelcome: undefined;
   OnboardingProfile: undefined;
+  Profile: undefined;
   SplashCraving: undefined;
   CuisineSelection: { cravingId: string };
   RestaurantDiscovery: { cravingId: string; cravingText?: string; cuisine: string };
+  TasteAttributes: {
+    cravingId: string;
+    cuisine: string;
+  };
   RestaurantDetail: { restaurantId: string; cravingId: string; cuisine: string; dishId?: string };
   DishDiscovery: { cravingId: string; cuisine: string; attributes: { temperature: string | null; flavor: string | null; texture: string | null; intensity: string | null; occasion: string | null; budget: string | null }; craving_text?: string };
   SoloCheck: {
@@ -105,7 +116,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const DiscoverStack = createNativeStackNavigator<DiscoverStackParamList>();
 const TrendingStack = createNativeStackNavigator<TrendingStackParamList>();
 
-function DiscoverStackNavigator() {
+function DiscoveryStackNavigator() {
   return (
     <DiscoverStack.Navigator
       screenOptions={{
@@ -114,7 +125,7 @@ function DiscoverStackNavigator() {
     >
       <DiscoverStack.Screen
         name="DiscoverHome"
-        component={DiscoverScreen}
+        component={HomeScreen}
       />
       <DiscoverStack.Screen
         name="SplashCraving"
@@ -216,20 +227,10 @@ function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="Home"
-        component={HomeScreen}
+        name="Discovery"
+        component={DiscoveryStackNavigator}
         options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <HomeIcon color={color} size={focused ? 24 : 22} />
-          )
-        }}
-      />
-      <Tab.Screen
-        name="Discover"
-        component={DiscoverStackNavigator}
-        options={{
-          tabBarLabel: 'Discover',
+          tabBarLabel: 'DISCOVERY',
           tabBarIcon: ({ color, focused }) => (
             <DiscoverIcon color={color} size={focused ? 24 : 22} />
           )
@@ -239,17 +240,37 @@ function MainTabs() {
         name="Trending"
         component={TrendingStackNavigator}
         options={{
-          tabBarLabel: 'Trending',
+          tabBarLabel: 'TRENDING',
           tabBarIcon: ({ color, focused }) => (
             <TrendingIcon color={color} size={focused ? 24 : 22} />
           )
         }}
       />
       <Tab.Screen
-        name="Profile"
+        name="Swipe"
+        component={SwipeDishesScreen}
+        options={{
+          tabBarLabel: 'SWIPE',
+          tabBarIcon: ({ color, focused }) => (
+            <SwipeIcon color={color} size={focused ? 24 : 22} />
+          )
+        }}
+      />
+      <Tab.Screen
+        name="Plans"
+        component={GroupDiningScreen}
+        options={{
+          tabBarLabel: 'PLANS',
+          tabBarIcon: ({ color, focused }) => (
+            <ConnectIcon color={color} size={focused ? 24 : 22} />
+          )
+        }}
+      />
+      <Tab.Screen
+        name="Bookmarks"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'PROFILE',
           tabBarIcon: ({ color, focused }) => (
             <ProfileIcon color={color} size={focused ? 24 : 22} />
           )
@@ -301,12 +322,17 @@ function AppContent() {
       >
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         <Stack.Screen name="OnboardingWelcome" component={OnboardingWelcomeScreen} />
         <Stack.Screen name="OnboardingProfile" component={OnboardingProfileScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
+        <Stack.Group screenOptions={{ presentation: 'modal' }}>
+          <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+        </Stack.Group>
         <Stack.Screen name="SplashCraving" component={SplashCravingScreen} />
         <Stack.Screen name="CuisineSelection" component={CuisineSelectionScreen} />
         <Stack.Screen name="RestaurantDiscovery" component={RestaurantDiscoveryScreen} />
+        <Stack.Screen name="TasteAttributes" component={TasteAttributesScreen} />
         <Stack.Screen name="RestaurantDetail" component={RestaurantDetailScreen} />
         <Stack.Screen name="DishDiscovery" component={DishDiscoveryScreen} />
         <Stack.Screen name="SoloCheck" component={SoloCheckScreen} />
@@ -327,4 +353,3 @@ export default function App() {
     </AppStateProvider>
   );
 }
-

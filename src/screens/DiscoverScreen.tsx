@@ -25,7 +25,7 @@ import { tokens } from '../theme/tokens';
 import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<TabParamList, 'Discover'>,
+  BottomTabScreenProps<TabParamList, 'Discovery'>,
   NativeStackScreenProps<DiscoverStackParamList>
 >;
 
@@ -124,7 +124,6 @@ export function DiscoverScreen({ navigation }: Props) {
     'Korean',
     'Filipino'
   ];
-
   // Fetch dishes for swipe mode
   React.useEffect(() => {
     if (mode === 'swipe') {

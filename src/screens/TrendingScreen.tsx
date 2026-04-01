@@ -1,436 +1,231 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   Image,
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
   ScrollView,
-  Dimensions
+  Dimensions,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { CompositeScreenProps } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { RootStackParamList, TabParamList, TrendingStackParamList } from '../../App';
+import { Ionicons } from '@expo/vector-icons';
+import { TrendingStackParamList } from '../../App';
 import { api } from '../api/client';
 import { useAppState } from '../state/AppStateContext';
-import { useTheme } from '../theme/useTheme';
-import { PostCard } from '../components/PostCard';
-import { ReviewCard } from '../components/ReviewCard';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, collectionGroup, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { tokens } from '../theme/tokens';
-import type { FoodPost, FoodReview } from '../services/firebaseClient';
-import { saveBookmarkedRestaurant, removeBookmarkedRestaurant, getBookmarkedRestaurants } from '../services/firebaseClient';
-import { WeatherWidget } from '../components/WeatherWidget';
 
 type Props = NativeStackScreenProps<TrendingStackParamList, 'TrendingHome'>;
 
-type TrendingRestaurant = {
+interface Restaurant {
   restaurant_id: string;
   name: string;
-  hero_photo_url: string | null;
+  hero_photo_url?: string | null;
   rating: number;
   price_level: number;
-  michelin_stars?: number;
-  michelin_designation?: 'plate' | 'bibGourmand' | '1-star' | '2-star' | '3-star';
-  michelin_label?: string;
   distance_meters?: number;
-  vibe_tags?: string[];
-};
-
-type MichelinRestaurant = {
-  name: string;
-  designation: 'plate' | 'bibGourmand';
   cuisine?: string;
-  price_level?: number;
-};
+  vibe_tags?: string[];
+  match_reason?: string;
+}
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - 40;
 
-const getMichelinBadge = (designation?: string, label?: string) => {
-  if (!designation) return null;
+const CATEGORIES = ['All', 'Mall Food', 'Quick Bites', 'Alfresco', 'Rooftop', 'Cozy Cafes', 'Date Night', 'New'];
+type TrendingCategoryParam =
+  | 'all'
+  | 'mall-food'
+  | 'quick-bites'
+  | 'garden'
+  | 'city-view'
+  | 'cozy-cafes'
+  | 'fine-dining'
+  | 'newest';
 
-  let icon = '';
-  let color = tokens.colors.textTertiary;
-
-  switch (designation) {
-    case 'bibGourmand':
-      icon = '🤤 Bib Gourmand';
-      color = tokens.colors.primary;
-      break;
-    case 'plate':
-      icon = '🍽️ Michelin Selection';
-      color = tokens.colors.textSecondary;
-      break;
-    case '1-star':
-      icon = '⭐ Michelin ★';
-      color = tokens.colors.primary;
-      break;
-    case '2-star':
-      icon = '⭐⭐ Michelin ★★';
-      color = '#FFA500';
-      break;
-    case '3-star':
-      icon = '⭐⭐⭐ Michelin ★★★';
-      color = '#FFD700';
-      break;
-    default:
-      return null;
-  }
-
-  return { icon, color };
+const getCategoryParam = (category: string): TrendingCategoryParam => {
+  const categoryMap: Record<string, TrendingCategoryParam> = {
+    'Mall Food': 'mall-food',
+    'Quick Bites': 'quick-bites',
+    'Alfresco': 'garden',
+    'Rooftop': 'city-view',
+    'Cozy Cafes': 'cozy-cafes',
+    'Date Night': 'fine-dining',
+    'New': 'newest'
+  };
+  return categoryMap[category] || 'all';
 };
 
 export function TrendingScreen({ navigation }: Props) {
-  const { state } = useAppState();
-  const { theme } = useTheme();
+  const rootNavigation = useNavigation<any>();
+  const [trendingRestaurants, setTrendingRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [allRestaurants, setAllRestaurants] = useState<TrendingRestaurant[]>([]);
-  const [michelinGuide, setMichelinGuide] = useState<{ bib_gourmand: MichelinRestaurant[]; michelin_selection: MichelinRestaurant[] }>({ bib_gourmand: [], michelin_selection: [] });
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const [liveFeed, setLiveFeed] = useState<(FoodPost | FoodReview)[]>([]);
-  const [loadingFeed, setLoadingFeed] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<'newest' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'all'>('newest');
-  const [error, setError] = useState<string | null>(null);
-  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const { state } = useAppState();
 
-  // Load trending restaurants based on selected category
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const searchLoc = state.searchLocation || state.location;
-        const location = searchLoc
-          ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
-          : { lat: 10.3157, lng: 123.8854 };
+  const loadTrendingData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const searchLoc = state.searchLocation || state.location;
+      const location = searchLoc
+        ? { lat: searchLoc.latitude, lng: searchLoc.longitude }
+        : { lat: 10.3157, lng: 123.8854 };
 
-        // Load bookmarked restaurants
-        if (state.authUser?.id) {
-          const { bookmarks } = await getBookmarkedRestaurants(state.authUser.id);
-          const bookmarkedSet = new Set(bookmarks.map((b: any) => b.restaurant_id));
-          setBookmarkedIds(bookmarkedSet);
-        }
+      const result = await api.getTrendingRestaurants({
+        ...location,
+        limit: 12,
+        category: getCategoryParam(selectedCategory),
+      });
 
-        // Fetch Michelin Guide
-        try {
-          const michelinData = await api.getMichelinGuide();
-          setMichelinGuide(michelinData);
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn('Failed to load Michelin guide:', e);
-        }
+      setTrendingRestaurants(result?.results || []);
+    } catch (error) {
+      console.error('Error loading trending data:', error);
+      setTrendingRestaurants([
+        {
+          restaurant_id: '1',
+          name: 'Orizuru Ramen',
+          hero_photo_url: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=500&h=400&fit=crop&q=80',
+          rating: 4.6,
+          price_level: 2,
+          distance_meters: 950,
+          cuisine: 'Japanese',
+          match_reason: 'Popular for late-night comfort bowls nearby.'
+        },
+        {
+          restaurant_id: '2',
+          name: 'Via Roma 14',
+          hero_photo_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=500&h=400&fit=crop&q=80',
+          rating: 4.5,
+          price_level: 3,
+          distance_meters: 1500,
+          cuisine: 'Italian',
+          match_reason: 'A frequent save for date-night plans.'
+        },
+        {
+          restaurant_id: '3',
+          name: 'The Hearth Grill',
+          hero_photo_url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&h=400&fit=crop&q=80',
+          rating: 4.7,
+          price_level: 2,
+          distance_meters: 1100,
+          cuisine: 'Modern European',
+          match_reason: 'Getting attention this week for its atmosphere.'
+        },
+        {
+          restaurant_id: '4',
+          name: 'Umami Omakase',
+          hero_photo_url: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=500&h=400&fit=crop&q=80',
+          rating: 4.9,
+          price_level: 4,
+          distance_meters: 2000,
+          cuisine: 'Sushi',
+          match_reason: 'A top pick for special dinners.'
+        },
+        {
+          restaurant_id: '5',
+          name: 'West Village Healthy Eats',
+          hero_photo_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&h=400&fit=crop&q=80',
+          rating: 4.8,
+          price_level: 2,
+          distance_meters: 500,
+          cuisine: 'Health',
+          match_reason: 'Frequently bookmarked for casual catch-ups.'
+        },
+        {
+          restaurant_id: '6',
+          name: 'Creamy Truffle Pasta',
+          hero_photo_url: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=500&h=400&fit=crop&q=80',
+          rating: 4.9,
+          price_level: 3,
+          distance_meters: 800,
+          cuisine: 'Italian',
+          match_reason: 'Trending for rich comfort food cravings.'
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [state.searchLocation, state.location, selectedCategory]);
 
-        // Fetch trending restaurants for selected category
-        const data = await api.getTrendingRestaurants({
-          lat: location.lat,
-          lng: location.lng,
-          limit: 15,
-          category: selectedCategory as any
-        });
-
-        // eslint-disable-next-line no-console
-        console.log(`🔥 Loaded ${data.results?.length || 0} restaurants for category: ${selectedCategory}`);
-        setAllRestaurants(data.results?.slice(0, 15) || []);
-      } catch (e) {
-        const errorMsg = (e as any)?.message || String(e);
-        // eslint-disable-next-line no-console
-        console.error('🔥 Failed to fetch trending data:', errorMsg);
-        setError(errorMsg);
-        setAllRestaurants([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [state.location, state.searchLocation, selectedCategory, state.authUser?.id]);
-
-  // Load live feed (posts and reviews from all users)
   useFocusEffect(
     React.useCallback(() => {
-      const loadLiveFeed = async () => {
-        try {
-          setLoadingFeed(true);
-          const db = getFirestore();
-
-          // Query all posts from all users using collectionGroup
-          let posts: (FoodPost & { id: string })[] = [];
-          let reviews: (FoodReview & { id: string })[] = [];
-
-          try {
-            // Try with orderBy first
-            const postsQuery = query(
-              collectionGroup(db, 'posts'),
-              orderBy('createdAt', 'desc'),
-              limit(20)
-            );
-            const postsSnapshot = await getDocs(postsQuery);
-            posts = postsSnapshot.docs.map((doc) => ({
-              ...doc.data(),
-              id: doc.id
-            })) as (FoodPost & { id: string })[];
-            // eslint-disable-next-line no-console
-            console.log('📝 Loaded posts with orderBy:', posts.length);
-          } catch (postError: any) {
-            // eslint-disable-next-line no-console
-            console.warn('OrderBy not available, trying without:', postError.message);
-            try {
-              // Fallback: query without orderBy
-              const postsSnapshot = await getDocs(collectionGroup(db, 'posts'));
-              posts = postsSnapshot.docs.map((doc) => ({
-                ...doc.data(),
-                id: doc.id
-              })) as (FoodPost & { id: string })[];
-              // eslint-disable-next-line no-console
-              console.log('📝 Loaded posts without orderBy:', posts.length);
-            } catch (fallbackError) {
-              // eslint-disable-next-line no-console
-              console.error('Failed to load posts:', fallbackError);
-            }
-          }
-
-          try {
-            // Try with orderBy first
-            const reviewsQuery = query(
-              collectionGroup(db, 'reviews'),
-              orderBy('createdAt', 'desc'),
-              limit(20)
-            );
-            const reviewsSnapshot = await getDocs(reviewsQuery);
-            reviews = reviewsSnapshot.docs.map((doc) => ({
-              ...doc.data(),
-              id: doc.id
-            })) as (FoodReview & { id: string })[];
-            // eslint-disable-next-line no-console
-            console.log('⭐ Loaded reviews with orderBy:', reviews.length);
-          } catch (reviewError: any) {
-            // eslint-disable-next-line no-console
-            console.warn('OrderBy not available, trying without:', reviewError.message);
-            try {
-              // Fallback: query without orderBy
-              const reviewsSnapshot = await getDocs(collectionGroup(db, 'reviews'));
-              reviews = reviewsSnapshot.docs.map((doc) => ({
-                ...doc.data(),
-                id: doc.id
-              })) as (FoodReview & { id: string })[];
-              // eslint-disable-next-line no-console
-              console.log('⭐ Loaded reviews without orderBy:', reviews.length);
-            } catch (fallbackError) {
-              // eslint-disable-next-line no-console
-              console.error('Failed to load reviews:', fallbackError);
-            }
-          }
-
-          // Merge and sort by timestamp
-          const combined = [...posts, ...reviews].sort((a, b) => {
-            const aTime = a.createdAt?.toMillis?.() || 0;
-            const bTime = b.createdAt?.toMillis?.() || 0;
-            return bTime - aTime;
-          });
-
-          // eslint-disable-next-line no-console
-          console.log('🔥 Combined feed items:', combined.length);
-          setLiveFeed(combined.slice(0, 30));
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Failed to load live feed:', e);
-          setLiveFeed([]);
-        } finally {
-          setLoadingFeed(false);
-        }
-      };
-
-      loadLiveFeed();
-    }, [])
+      loadTrendingData();
+    }, [loadTrendingData])
   );
 
-  // Handle bookmark
-  const handleToggleBookmark = async (restaurant: TrendingRestaurant) => {
-    if (!state.authUser?.id) return;
-
-    const isBookmarked = bookmarkedIds.has(restaurant.restaurant_id);
-
-    try {
-      if (isBookmarked) {
-        await removeBookmarkedRestaurant(state.authUser.id, restaurant.restaurant_id);
-        const newSet = new Set(bookmarkedIds);
-        newSet.delete(restaurant.restaurant_id);
-        setBookmarkedIds(newSet);
-      } else {
-        await saveBookmarkedRestaurant(state.authUser.id, {
-          restaurant_id: restaurant.restaurant_id,
-          name: restaurant.name,
-          rating: restaurant.rating,
-          price_level: restaurant.price_level,
-          distance_meters: restaurant.distance_meters,
-          hero_photo_url: restaurant.hero_photo_url || undefined
-        });
-        const newSet = new Set(bookmarkedIds);
-        newSet.add(restaurant.restaurant_id);
-        setBookmarkedIds(newSet);
-      }
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to toggle bookmark:', error);
-    }
+  const formatDistance = (meters?: number) => {
+    if (!meters) return '—';
+    if (meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(1)}km`;
   };
 
-  // Organize restaurants by category
-  const michelinRestaurants = allRestaurants.filter((r) => r.michelin_designation);
-  const topRatedRestaurants = [...allRestaurants]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 5);
-  const trendingRestaurants = allRestaurants.slice(0, 8);
+  const handleNavigateToRestaurant = (restaurant: Restaurant) => {
+    navigation.navigate('RestaurantDetail', {
+      restaurantId: restaurant.restaurant_id,
+      cravingId: 'trending',
+      cuisine: restaurant.cuisine || 'all',
+    });
+  };
 
-  const renderCarouselCard = ({ item }: { item: TrendingRestaurant }) => (
-    <View style={styles.carouselCard}>
-      <TouchableOpacity
-        style={styles.carouselTouchable}
-        onPress={() => {
-          navigation.navigate('RestaurantDetail' as any, {
-            restaurantId: item.restaurant_id,
-            cravingId: 'trending',
-            cuisine: ''
-          });
-        }}
-        activeOpacity={0.9}
-      >
-        {item.hero_photo_url && (
-          <Image
-            source={{ uri: item.hero_photo_url }}
-            style={styles.carouselImage}
-          />
-        )}
-        <View style={styles.carouselOverlay}>
-          <View style={styles.carouselContent}>
-            <Text style={styles.carouselName}>{item.name}</Text>
-            <Text style={styles.carouselMeta}>
-              {item.rating.toFixed(1)} ★ • {'$'.repeat(item.price_level || 1)}
-            </Text>
-            {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
-              <View
-                style={[
-                  styles.carouselMichelinBadge,
-                  { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
-                ]}
-              >
-                <Text style={styles.carouselMichelinText}>
-                  {getMichelinBadge(item.michelin_designation)?.icon}
-                </Text>
-              </View>
-            ) : null}
-          </View>
+  const renderTrendingCard = ({ item, index }: { item: Restaurant; index: number }) => (
+    <TouchableOpacity
+      key={item.restaurant_id}
+      style={styles.trendingCard}
+      onPress={() => handleNavigateToRestaurant(item)}
+      activeOpacity={0.85}
+    >
+      {item.hero_photo_url ? (
+        <Image source={{ uri: item.hero_photo_url }} style={styles.trendingImage} />
+      ) : (
+        <View style={[styles.trendingImage, styles.imagePlaceholder]}>
+          <Ionicons name="restaurant-outline" size={40} color={tokens.colors.primary} />
         </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.bookmarkButton}
-        onPress={() => handleToggleBookmark(item)}
-      >
-        <Text style={styles.bookmarkIcon}>
-          {bookmarkedIds.has(item.restaurant_id) ? '🔖' : '🔖'}
+      )}
+      <View style={styles.trendingOverlay}>
+        <Text style={styles.trendingName}>{item.name}</Text>
+        <Text style={styles.trendingMeta}>
+          {(item.cuisine || 'Cuisine').replace(/_/g, ' ')} • {formatDistance(item.distance_meters)}
         </Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.badgeContainer}>
+          {index === 0 && <Text style={styles.badge}>TRENDING NOW</Text>}
+          {index === 1 && <Text style={styles.badge}>BUZZING</Text>}
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 
-  const renderSmallCard = ({ item }: { item: TrendingRestaurant }) => (
-    <View>
-      <TouchableOpacity
-        style={styles.smallCard}
-        onPress={() => {
-          navigation.navigate('RestaurantDetail' as any, {
-            restaurantId: item.restaurant_id,
-            cravingId: 'trending',
-            cuisine: ''
-          });
-        }}
-      >
-        <View style={styles.smallCardImageContainer}>
-          {item.hero_photo_url ? (
-            <Image
-              source={{ uri: item.hero_photo_url }}
-              style={styles.smallCardImage}
-            />
-          ) : (
-            <View style={[styles.smallCardImage, styles.smallCardImagePlaceholder]}>
-              <Text style={styles.smallCardImagePlaceholderText}>🍽️</Text>
-            </View>
-          )}
+  const renderSocialProofCard = (restaurant: Restaurant, label: string, caption: string) => (
+    <TouchableOpacity
+      key={`${label}-${restaurant.restaurant_id}`}
+      style={styles.proofCard}
+      onPress={() => handleNavigateToRestaurant(restaurant)}
+      activeOpacity={0.85}
+    >
+      {restaurant.hero_photo_url ? (
+        <Image source={{ uri: restaurant.hero_photo_url }} style={styles.proofImage} />
+      ) : (
+        <View style={[styles.proofImage, styles.imagePlaceholder]}>
+          <Ionicons name="restaurant-outline" size={32} color={tokens.colors.primary} />
         </View>
-
-        <View style={styles.smallCardContent}>
-          <View style={styles.smallCardInfo}>
-            <Text style={styles.smallCardName} numberOfLines={2}>{item.name}</Text>
-            <Text style={styles.smallCardMeta}>
-              {item.rating.toFixed(1)} ★ •{'$'.repeat(item.price_level || 1)}
-              {item.distance_meters && (
-                <>
-                  {' '}
-                  • {item.distance_meters > 1000
-                    ? `${(item.distance_meters / 1000).toFixed(1)}km`
-                    : `${item.distance_meters}m`}
-                </>
-              )}
-            </Text>
-          </View>
-          <View style={styles.smallCardActions}>
-            {item.michelin_designation && getMichelinBadge(item.michelin_designation) ? (
-              <View
-                style={[
-                  styles.smallMichelinBadge,
-                  { backgroundColor: getMichelinBadge(item.michelin_designation)?.color }
-                ]}
-              >
-                <Text style={styles.smallMichelinText}>
-                  {getMichelinBadge(item.michelin_designation)?.icon}
-                </Text>
-              </View>
-            ) : null}
-            <TouchableOpacity
-              onPress={() => handleToggleBookmark(item)}
-              style={styles.smallBookmarkButton}
-            >
-              <Text style={styles.smallBookmarkIcon}>
-                {bookmarkedIds.has(item.restaurant_id) ? '🔖' : '☐'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </View>
+      )}
+      <View style={styles.proofContent}>
+        <Text style={styles.proofBadge}>{label}</Text>
+        <Text style={styles.proofTitle} numberOfLines={1}>{restaurant.name}</Text>
+        <Text style={styles.proofCaption} numberOfLines={2}>
+          {restaurant.match_reason || caption}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={tokens.colors.primary} size="large" />
-          <Text style={styles.loadingText}>Discovering trending spots...</Text>
-          <Text style={styles.loadingText}>{selectedCategory}</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { color: 'red' }]}>ERROR:</Text>
-          <Text style={[styles.loadingText, { color: 'red', fontSize: 12 }]}>{error}</Text>
-          <Text style={[styles.loadingText, { color: 'gray', fontSize: 12, marginTop: 20 }]}>
-            API URL: {process.env.EXPO_PUBLIC_API_URL}
-          </Text>
-          <Text style={[styles.loadingText, { color: 'gray', fontSize: 12 }]}>
-            Category: {selectedCategory}
-          </Text>
+          <ActivityIndicator size="large" color={tokens.colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -439,262 +234,115 @@ export function TrendingScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View>
-              <Text style={styles.title}>🔥 What's Trending</Text>
-              <Text style={styles.subtitle}>
-                In {state.searchLocation?.address?.split(',')[0] || 'Cebu'} right now
-              </Text>
-            </View>
+          <View>
+            <Text style={styles.logo}>Trending</Text>
+            <Text style={styles.headerSubtitle}>What people are saving and noticing nearby.</Text>
+          </View>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity style={styles.iconButton}>
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color={tokens.colors.textPrimary}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={() => rootNavigation.navigate('Profile')}>
+              <Ionicons
+                name="person-circle"
+                size={24}
+                color={tokens.colors.textPrimary}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Category Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryContainer}>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'newest' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('newest')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'newest' && styles.categoryLabelActive]}>
-              ✨ Newest
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'garden' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('garden')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'garden' && styles.categoryLabelActive]}>
-              🌿 Garden
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'city-view' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('city-view')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'city-view' && styles.categoryLabelActive]}>
-              🏙️ City View
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'cozy-cafes' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('cozy-cafes')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'cozy-cafes' && styles.categoryLabelActive]}>
-              ☕ Cozy Cafes
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'fine-dining' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('fine-dining')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'fine-dining' && styles.categoryLabelActive]}>
-              🍽️ Fine Dining
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.categoryPill, selectedCategory === 'all' && styles.categoryPillActive]}
-            onPress={() => setSelectedCategory('all')}
-          >
-            <Text style={[styles.categoryLabel, selectedCategory === 'all' && styles.categoryLabelActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScroll}
+        >
+          {CATEGORIES.map((category) => (
+            <TouchableOpacity
+              key={category}
+              onPress={() => setSelectedCategory(category)}
+              style={[
+                styles.categoryPill,
+                selectedCategory === category && { backgroundColor: tokens.colors.primary }
+              ]}
+            >
+              <Text style={[
+                styles.categoryText,
+                selectedCategory === category && { color: 'white' }
+              ]}>
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
 
-        {/* Weather Widget */}
-        <WeatherWidget />
-
-        {/* Michelin Guide Section */}
-        {(michelinGuide.bib_gourmand.length > 0 || michelinGuide.michelin_selection.length > 0) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>MICHELIN GUIDE</Text>
-
-            {michelinGuide.bib_gourmand.length > 0 && (
-              <>
-                <Text style={styles.subsectionTitle}>🤤 Bib Gourmand</Text>
-                {michelinGuide.bib_gourmand.map((restaurant) => (
-                  <View key={restaurant.name} style={styles.michelinCard}>
-                    <View style={styles.michelinCardContent}>
-                      <View>
-                        <Text style={styles.michelinCardName}>{restaurant.name}</Text>
-                        <Text style={styles.michelinCardMeta}>
-                          {restaurant.cuisine} • {'$'.repeat(restaurant.price_level || 1)}
-                        </Text>
-                      </View>
-                      <View style={[styles.michelinBadge, { backgroundColor: '#FF6A2A' }]}>
-                        <Text style={styles.michelinBadgeText}>🤤</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
-
-            {michelinGuide.michelin_selection.length > 0 && (
-              <>
-                <Text style={styles.subsectionTitle}>🍽️ Michelin Selection</Text>
-                {michelinGuide.michelin_selection.map((restaurant) => (
-                  <View key={restaurant.name} style={styles.michelinCard}>
-                    <View style={styles.michelinCardContent}>
-                      <View>
-                        <Text style={styles.michelinCardName}>{restaurant.name}</Text>
-                        <Text style={styles.michelinCardMeta}>
-                          {restaurant.cuisine} • {'$'.repeat(restaurant.price_level || 1)}
-                        </Text>
-                      </View>
-                      <View style={[styles.michelinBadge, { backgroundColor: '#6B6B6B' }]}>
-                        <Text style={styles.michelinBadgeText}>🍽️</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Carousel Section */}
-        {trendingRestaurants.length > 0 && (
-          <View style={styles.carouselSection}>
-            <FlatList
-              horizontal
-              data={trendingRestaurants}
-              keyExtractor={(item) => item.restaurant_id}
-              renderItem={renderCarouselCard}
-              snapToInterval={CARD_WIDTH + 20}
-              decelerationRate="fast"
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselContent}
-              onMomentumScrollEnd={(event) => {
-                const index = Math.round(
-                  event.nativeEvent.contentOffset.x / (CARD_WIDTH + 20)
-                );
-                setCarouselIndex(index);
-              }}
-            />
-            {/* Carousel Dots */}
-            <View style={styles.dotsContainer}>
-              {trendingRestaurants.slice(0, 5).map((_, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.dot,
-                    idx === carouselIndex % trendingRestaurants.length &&
-                      styles.dotActive
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Michelin Restaurants Section - Only show for 'all' category */}
-        {selectedCategory === 'all' && michelinRestaurants.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>MICHELIN HONORED</Text>
-            {michelinRestaurants.slice(0, 5).map((restaurant) => (
-              <View key={restaurant.restaurant_id}>
-                {renderSmallCard({ item: restaurant })}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Top Rated Section - Only show for 'all' category */}
-        {selectedCategory === 'all' && topRatedRestaurants.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>TOP RATED</Text>
-            {topRatedRestaurants.map((restaurant) => (
-              <View key={restaurant.restaurant_id}>
-                {renderSmallCard({ item: restaurant })}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Category Results Section */}
-        {trendingRestaurants.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {selectedCategory === 'newest' && '✨ TRENDING & NEWEST'}
-              {selectedCategory === 'garden' && '🌿 GARDEN RESTAURANTS'}
-              {selectedCategory === 'city-view' && '🏙️ ROOFTOP & CITY VIEWS'}
-              {selectedCategory === 'cozy-cafes' && '☕ COZY & INTIMATE CAFES'}
-              {selectedCategory === 'fine-dining' && '🍽️ FINE DINING'}
-              {selectedCategory === 'all' && '🔥 TRENDING NOW'}
-            </Text>
-            {trendingRestaurants.map((restaurant) => (
-              <View key={restaurant.restaurant_id}>
-                {renderSmallCard({ item: restaurant })}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Loading or Empty State */}
-        {!loading && trendingRestaurants.length === 0 && (
-          <View style={styles.section}>
-            <View style={styles.emptyFeedContainer}>
-              <Text style={styles.emptyFeedEmoji}>🍽️</Text>
-              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>
-                No restaurants found
-              </Text>
-              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
-                Try a different category
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Live Feed Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>LIVE FEED</Text>
-          {loadingFeed ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color={tokens.colors.primary} size="small" />
-            </View>
-          ) : liveFeed.length === 0 ? (
-            <View style={styles.emptyFeedContainer}>
-              <Text style={[styles.emptyFeedEmoji]}>🍽️</Text>
-              <Text style={[styles.emptyFeedText, { color: theme.colors.textPrimary }]}>No posts yet</Text>
-              <Text style={[styles.emptyFeedSubtext, { color: theme.colors.textSecondary }]}>
-                Be the first to share your food experience!
-              </Text>
-            </View>
-          ) : (
-            liveFeed.map((item) => {
-              if ('emoji' in item && 'text' in item) {
-                // It's a post
-                const post = item as FoodPost & { id: string };
-                return (
-                  <View key={post.id} style={styles.feedItem}>
-                    <PostCard
-                      emoji={post.emoji}
-                      text={post.text}
-                      restaurantName={post.restaurantName}
-                      createdAt={post.createdAt}
-                    />
-                  </View>
-                );
-              } else {
-                // It's a review
-                const review = item as FoodReview & { id: string };
-                return (
-                  <View key={review.id} style={styles.feedItem}>
-                    <ReviewCard
-                      restaurantName={review.restaurantName}
-                      rating={review.rating}
-                      text={review.text}
-                      createdAt={review.createdAt}
-                    />
-                  </View>
-                );
-              }
-            })
-          )}
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Trending Near You</Text>
+            <Ionicons name="flame" size={20} color={tokens.colors.primary} />
+          </View>
+
+          <ScrollView
+            horizontal
+            pagingEnabled
+            scrollEventThrottle={16}
+            snapToInterval={CARD_WIDTH + 20}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.trendingListContent}
+          >
+            {trendingRestaurants.slice(0, 6).map((restaurant, index) =>
+              renderTrendingCard({ item: restaurant, index })
+            )}
+          </ScrollView>
         </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Most Saved This Week</Text>
+            <Ionicons name="bookmark" size={18} color={tokens.colors.primary} />
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.proofRow}
+          >
+            {trendingRestaurants.slice(2, 6).map((restaurant, index) =>
+              renderSocialProofCard(
+                restaurant,
+                index === 0 ? 'MOST SAVED' : 'BUZZING',
+                'Getting attention from nearby diners this week.'
+              )
+            )}
+          </ScrollView>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>New & Buzzing</Text>
+            <Ionicons name="sparkles" size={18} color={tokens.colors.primary} />
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.proofRow}
+          >
+            {trendingRestaurants.slice(6, 10).map((restaurant) =>
+              renderSocialProofCard(
+                restaurant,
+                'NEW',
+                'Worth a look if you want something fresh nearby.'
+              )
+            )}
+          </ScrollView>
+        </View>
+
+        <View style={{ height: tokens.spacing.xxxl }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -703,322 +351,160 @@ export function TrendingScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: tokens.colors.background
+    backgroundColor: tokens.colors.background,
   },
-  categoryContainer: {
+  header: {
     flexDirection: 'row',
-    paddingHorizontal: tokens.spacing.xl,
-    marginBottom: tokens.spacing.xl,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.lg,
+  },
+  logo: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: tokens.colors.primary,
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    fontSize: tokens.typography.small.fontSize,
+    color: tokens.colors.textSecondary,
+    fontWeight: '500',
+    maxWidth: 240,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    gap: tokens.spacing.lg,
+  },
+  iconButton: {
+    padding: tokens.spacing.sm,
+  },
+  categoryScroll: {
+    paddingHorizontal: tokens.spacing.lg,
+    paddingBottom: tokens.spacing.lg,
     gap: tokens.spacing.md,
-    paddingBottom: tokens.spacing.md
   },
   categoryPill: {
     paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.lg,
-    backgroundColor: tokens.colors.backgroundLight,
+    paddingVertical: tokens.spacing.md,
+    borderRadius: tokens.radius.full,
     borderWidth: 1,
     borderColor: tokens.colors.border,
-    minHeight: 40
+    backgroundColor: tokens.colors.backgroundLight,
   },
-  categoryPillActive: {
-    backgroundColor: tokens.colors.primary,
-    borderColor: tokens.colors.primary
-  },
-  categoryLabel: {
-    fontSize: 12,
+  categoryText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: tokens.colors.textSecondary
-  },
-  categoryLabelActive: {
-    color: tokens.colors.textInverse
+    color: tokens.colors.textSecondary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
-  loadingText: {
-    marginTop: tokens.spacing.md,
-    fontSize: 14,
-    color: tokens.colors.textSecondary
+  section: {
+    marginBottom: tokens.spacing.xxl,
   },
-  header: {
-    paddingHorizontal: tokens.spacing.xl,
-    paddingTop: tokens.spacing.xl,
-    paddingBottom: tokens.spacing.lg
-  },
-  headerTop: {
+  sectionTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start'
+    alignItems: 'center',
+    gap: tokens.spacing.sm,
+    paddingHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm,
-    lineHeight: 40
+  sectionTitle: {
+    fontSize: tokens.typography.h3.fontSize,
+    fontWeight: tokens.typography.h3.fontWeight,
+    color: tokens.colors.textHeading,
   },
-  subtitle: {
-    fontSize: 15,
-    color: tokens.colors.textSecondary,
-    lineHeight: 20
-  },
-  carouselSection: {
-    marginBottom: tokens.spacing.xxxl,
-    marginTop: tokens.spacing.xl
-  },
-  carouselContent: {
-    paddingHorizontal: tokens.spacing.xl,
+  trendingListContent: {
+    paddingHorizontal: tokens.spacing.lg,
     gap: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.md
   },
-  carouselCard: {
-    width: CARD_WIDTH,
-    height: 240,
-    borderRadius: tokens.radius.xl,
+  trendingCard: {
+    width: CARD_WIDTH / 2 - 10,
+    height: 220,
+    borderRadius: tokens.radius.lg,
     overflow: 'hidden',
-    ...tokens.shadows.lg,
-    position: 'relative'
+    backgroundColor: tokens.colors.backgroundLight,
   },
-  carouselTouchable: {
+  trendingImage: {
     width: '100%',
-    height: '100%'
+    height: '100%',
+    backgroundColor: tokens.colors.primaryTint,
   },
-  carouselImage: {
-    width: '100%',
-    height: '100%'
-  },
-  bookmarkButton: {
-    position: 'absolute',
-    top: tokens.spacing.md,
-    right: tokens.spacing.md,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  imagePlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
-    ...tokens.shadows.md
   },
-  bookmarkIcon: {
-    fontSize: 24
-  },
-  carouselOverlay: {
+  trendingOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    padding: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.xl,
-    paddingTop: tokens.spacing.xxl
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: tokens.spacing.md,
   },
-  carouselContentGap: {
-    gap: tokens.spacing.md
-  },
-  carouselName: {
-    fontSize: 18,
-    fontWeight: '700',
+  trendingName: {
+    fontSize: tokens.typography.body.fontSize,
+    fontWeight: '600',
     color: tokens.colors.textInverse,
-    marginBottom: tokens.spacing.xs
+    marginBottom: tokens.spacing.sm,
   },
-  carouselMeta: {
-    fontSize: 13,
-    color: tokens.colors.textInverse,
-    fontWeight: '500',
-    opacity: 0.95
+  trendingMeta: {
+    fontSize: tokens.typography.caption.fontSize,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '600',
+    marginBottom: tokens.spacing.sm,
+    textTransform: 'capitalize',
   },
-  carouselMichelinBadge: {
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
-    borderRadius: tokens.radius.md,
-    alignSelf: 'flex-start'
-  },
-  carouselMichelinText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: tokens.colors.textInverse
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: tokens.spacing.md,
-    marginTop: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.md
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: tokens.colors.border,
-    opacity: 0.5
-  },
-  dotActive: {
-    backgroundColor: tokens.colors.primary,
-    width: 20,
-    opacity: 1
-  },
-  section: {
-    paddingHorizontal: tokens.spacing.xl,
-    marginBottom: tokens.spacing.xxxl,
-    marginTop: tokens.spacing.xxl
-  },
-  sectionTitle: {
-    ...tokens.typography.label,
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.xl,
-    fontSize: 14,
-    letterSpacing: 0.8,
-    fontWeight: '800',
-    textTransform: 'uppercase'
-  },
-  smallCard: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.lg,
-    marginBottom: tokens.spacing.lg,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    ...tokens.shadows.sm,
-    overflow: 'hidden'
-  },
-  smallCardImageContainer: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#E8E8E8'
-  },
-  smallCardImage: {
-    width: '100%',
-    height: '100%'
-  },
-  smallCardImagePlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: tokens.colors.primaryTint
-  },
-  smallCardImagePlaceholderText: {
-    fontSize: 40
-  },
-  smallCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: tokens.spacing.md,
-    padding: tokens.spacing.lg
-  },
-  smallCardInfo: {
-    flex: 1
-  },
-  smallCardActions: {
+  badgeContainer: {
     flexDirection: 'row',
     gap: tokens.spacing.sm,
-    alignItems: 'center',
-    flexShrink: 0
   },
-  smallCardName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm,
-    lineHeight: 22
-  },
-  smallCardMeta: {
-    fontSize: 13,
-    color: tokens.colors.textSecondary,
-    fontWeight: '500',
-    lineHeight: 18
-  },
-  smallBookmarkButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  smallBookmarkIcon: {
-    fontSize: 20
-  },
-  smallMichelinBadge: {
-    minWidth: 44,
-    minHeight: 44,
-    paddingHorizontal: tokens.spacing.md,
-    paddingVertical: tokens.spacing.sm,
+  badge: {
+    fontSize: tokens.typography.caption.fontSize,
+    fontWeight: '600',
+    color: tokens.colors.primary,
+    backgroundColor: tokens.colors.textInverse,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: tokens.spacing.xs,
     borderRadius: tokens.radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0
   },
-  smallMichelinText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: tokens.colors.textInverse
+  proofRow: {
+    paddingHorizontal: tokens.spacing.lg,
+    gap: tokens.spacing.md,
   },
-  subsectionTitle: {
-    fontSize: 15,
+  proofCard: {
+    width: 220,
+    backgroundColor: tokens.colors.backgroundLight,
+    borderRadius: tokens.radius.lg,
+    overflow: 'hidden',
+    ...tokens.shadows.sm,
+  },
+  proofImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: tokens.colors.primaryTint,
+  },
+  proofContent: {
+    padding: tokens.spacing.md,
+  },
+  proofBadge: {
+    fontSize: tokens.typography.caption.fontSize,
     fontWeight: '700',
     color: tokens.colors.primary,
-    marginBottom: tokens.spacing.lg,
-    marginTop: tokens.spacing.xl,
-    letterSpacing: 0.3
-  },
-  michelinCard: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.md,
-    padding: tokens.spacing.lg,
-    marginBottom: tokens.spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: tokens.colors.primary,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    ...tokens.shadows.sm,
-    minHeight: 70
-  },
-  michelinCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: tokens.spacing.md
-  },
-  michelinCardName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: tokens.colors.textPrimary,
     marginBottom: tokens.spacing.xs,
-    flex: 1
   },
-  michelinCardMeta: {
-    fontSize: 13,
+  proofTitle: {
+    fontSize: tokens.typography.body.fontSize,
+    fontWeight: '700',
+    color: tokens.colors.textHeading,
+    marginBottom: tokens.spacing.xs,
+  },
+  proofCaption: {
+    fontSize: tokens.typography.small.fontSize,
     color: tokens.colors.textSecondary,
-    fontWeight: '500'
+    lineHeight: 18,
   },
-  michelinBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  michelinBadgeText: {
-    fontSize: 20
-  },
-  feedItem: {
-    marginBottom: tokens.spacing.md
-  },
-  emptyFeedContainer: {
-    alignItems: 'center',
-    paddingVertical: tokens.spacing.xxxl
-  },
-  emptyFeedEmoji: {
-    fontSize: 48,
-    marginBottom: tokens.spacing.lg
-  },
-  emptyFeedText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: tokens.spacing.sm
-  },
-  emptyFeedSubtext: {
-    fontSize: 14,
-    textAlign: 'center'
-  }
 });

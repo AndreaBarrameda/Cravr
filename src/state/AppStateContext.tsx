@@ -15,6 +15,21 @@ type LocationData = {
   address?: string;
 };
 
+type LikedDish = {
+  dish_id: string;
+  name: string;
+  restaurant_name: string;
+  cuisine?: string;
+  tags?: string[];
+  timestamp: number;
+};
+
+type FoodPreference = {
+  name: string;
+  count: number;
+  percentage: number;
+};
+
 type AppState = {
   location?: LocationData;
   searchLocation?: LocationData;
@@ -36,6 +51,9 @@ type AppState = {
   isAuthenticated?: boolean;
   authUser?: AuthUser;
   darkMode?: boolean;
+  searchHistory?: string[];
+  likedDishes?: LikedDish[];
+  foodPreferences?: FoodPreference[];
 };
 
 type AppStateContextValue = {
@@ -115,5 +133,39 @@ export function useAppState() {
     throw new Error('useAppState must be used within AppStateProvider');
   }
   return ctx;
+}
+
+// Helper functions for preference tracking
+export function extractFoodPreferences(likedDishes: LikedDish[]): FoodPreference[] {
+  if (!likedDishes || likedDishes.length === 0) return [];
+
+  // Count cuisine preferences from liked dishes
+  const cuisineCounts: { [key: string]: number } = {};
+  const keywordCounts: { [key: string]: number } = {};
+
+  likedDishes.forEach((dish) => {
+    // Extract cuisine from restaurant name or dish tags
+    const keywords = (dish.name.toLowerCase().split(/\s+/)).concat(
+      dish.tags?.map((t) => t.toLowerCase()) || []
+    );
+
+    keywords.forEach((keyword) => {
+      if (keyword.length > 3) {
+        keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
+      }
+    });
+  });
+
+  // Convert to sorted preference array
+  const preferences = Object.entries(keywordCounts)
+    .map(([name, count]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      count,
+      percentage: (count / likedDishes.length) * 100,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5); // Top 5 preferences
+
+  return preferences;
 }
 

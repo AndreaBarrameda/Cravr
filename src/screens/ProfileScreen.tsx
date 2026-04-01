@@ -1,125 +1,68 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
   SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
   Alert,
-  Image,
   TextInput,
-  FlatList,
-  Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
-import { CompositeScreenProps } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { RootStackParamList, TabParamList } from '../../App';
-import { CravrButton } from '../components/UI';
-import { PostCard } from '../components/PostCard';
-import { ReviewCard } from '../components/ReviewCard';
-import { CreatePostSheet } from '../components/CreatePostSheet';
-import { SettingsMenu } from '../components/SettingsMenu';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAppState } from '../state/AppStateContext';
 import { useTheme } from '../theme/useTheme';
-import { getLocationWithUserConsent } from '../services/locationService';
 import {
-  logout,
   updateUserBio,
-  getUserPosts,
   getUserReviews,
-  createPost,
-  createReview,
-  saveUserPreferences,
   getBookmarkedRestaurants,
-  removeBookmarkedRestaurant,
-  type FoodPost,
   type FoodReview,
   type BookmarkedRestaurant
 } from '../services/firebaseClient';
 import { tokens } from '../theme/tokens';
 
-type Props = CompositeScreenProps<
-  BottomTabScreenProps<TabParamList, 'Profile'>,
-  NativeStackScreenProps<RootStackParamList>
->;
-
-const CUISINES = [
-  'Filipino',
-  'Chinese',
-  'Japanese',
-  'Korean',
-  'Thai',
-  'Vietnamese',
-  'Indian',
-  'Italian',
-  'American',
-  'Mexican',
-  'Mediterranean',
-  'Middle Eastern'
-];
-
-export function ProfileScreen({ navigation }: Props) {
+export function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { state, setState } = useAppState();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
 
-  // Bio editing
   const [editingBio, setEditingBio] = useState(false);
-  const [bioText, setBioText] = useState(state.userProfile?.bio || '');
+  const [bioText, setBioText] = useState(state.userProfile?.bio || 'On a mission to find the best handmade pasta in the city. Sucker for a spicy kick and natural wines. 🍝');
   const [savingBio, setSavingBio] = useState(false);
-
-  // Preferences editing
-  const [editingPrefs, setEditingPrefs] = useState(false);
-  const [editCuisine, setEditCuisine] = useState('');
-  const [editFood, setEditFood] = useState('');
-  const [savingPrefs, setSavingPrefs] = useState(false);
-
-  // Feed
-  const [activeTab, setActiveTab] = useState<'posts' | 'reviews' | 'bookmarks'>('posts');
-  const [posts, setPosts] = useState<(FoodPost & { id: string })[]>([]);
+  const [activeTab, setActiveTab] = useState<'reviews' | 'bookmarks'>('reviews');
   const [reviews, setReviews] = useState<(FoodReview & { id: string })[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkedRestaurant[]>([]);
-  const [loadingFeed, setLoadingFeed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Create post sheet
-  const [sheetVisible, setSheetVisible] = useState(false);
-
-  // Settings menu
-  const [menuVisible, setMenuVisible] = useState(false);
-
-  const name = state.userProfile?.name || 'User';
+  const name = state.userProfile?.name || 'Alex Chef-in-Training';
   const initials = name
     .split(' ')
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join('')
-    .toUpperCase();
+    .toUpperCase()
+    .slice(0, 2);
 
   const userId = state.authUser?.id;
 
-  // Load feed when tab changes or screen is focused
   const loadFeed = useCallback(async () => {
     if (!userId) return;
     try {
-      setLoadingFeed(true);
-      if (activeTab === 'posts') {
-        const { posts: loadedPosts } = await getUserPosts(userId);
-        setPosts(loadedPosts);
-      } else if (activeTab === 'reviews') {
-        const { reviews: loadedReviews } = await getUserReviews(userId);
-        setReviews(loadedReviews);
-      } else if (activeTab === 'bookmarks') {
-        const { bookmarks: loadedBookmarks } = await getBookmarkedRestaurants(userId);
-        setBookmarks(loadedBookmarks);
+      setLoading(true);
+      if (activeTab === 'reviews') {
+        const result = await getUserReviews(userId);
+        setReviews(result?.reviews || []);
+      } else {
+        const result = await getBookmarkedRestaurants(userId);
+        setBookmarks(Array.isArray(result) ? result : result?.bookmarks || []);
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Failed to load feed:', error);
     } finally {
-      setLoadingFeed(false);
+      setLoading(false);
     }
   }, [userId, activeTab]);
 
@@ -134,7 +77,7 @@ export function ProfileScreen({ navigation }: Props) {
     try {
       setSavingBio(true);
       await updateUserBio(userId, bioText);
-      setState((prev) => ({
+      setState((prev: any) => ({
         ...prev,
         userProfile: { ...prev.userProfile, bio: bioText, name: prev.userProfile?.name || '' }
       }));
@@ -147,813 +90,483 @@ export function ProfileScreen({ navigation }: Props) {
     }
   };
 
-  const handleCancelBio = () => {
-    setBioText(state.userProfile?.bio || '');
-    setEditingBio(false);
-  };
-
-  const handleOpenEditPrefs = () => {
-    setEditCuisine(state.userProfile?.favoriteCuisine || '');
-    setEditFood(state.userProfile?.favoriteFood || '');
-    setEditingPrefs(true);
-  };
-
-  const handleSavePrefs = async () => {
-    if (!userId) return;
-    if (!editCuisine || !editFood.trim()) return;
-    try {
-      setSavingPrefs(true);
-      await saveUserPreferences(userId, {
-        favoriteCuisine: editCuisine,
-        favoriteFood: editFood.trim()
-      });
-      setState((prev) => ({
-        ...prev,
-        userProfile: {
-          ...prev.userProfile,
-          favoriteCuisine: editCuisine,
-          favoriteFood: editFood.trim(),
-          name: prev.userProfile?.name || ''
-        }
-      }));
-      setEditingPrefs(false);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save preferences');
-    } finally {
-      setSavingPrefs(false);
-    }
-  };
-
-  const handleCancelPrefs = () => {
-    setEditingPrefs(false);
-  };
-
-  const handleCreatePost = async (data: any) => {
-    if (!userId) return;
-    const result = await createPost(userId, data);
-    if (result.error) throw new Error(result.error);
-  };
-
-  const handleCreateReview = async (data: any) => {
-    if (!userId) return;
-    const result = await createReview(userId, data);
-    if (result.error) throw new Error(result.error);
-  };
-
-  const handleNavigateOnboarding = () => {
-    setState((prev) => ({
-      ...prev,
-      onboardingComplete: false
-    }));
-    navigation.navigate('OnboardingWelcome');
-  };
-
-  const handleLogoutNav = () => {
-    navigation.navigate('Login');
-  };
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Hamburger Menu Header */}
-      <View style={[styles.topBar, { backgroundColor: theme.colors.backgroundLight, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.topBarTitle, { color: theme.colors.textPrimary }]}>Profile</Text>
-        <TouchableOpacity
-          style={styles.hamburgerButton}
-          onPress={() => setMenuVisible(true)}
-        >
-          <Text style={styles.hamburgerIcon}>☰</Text>
-        </TouchableOpacity>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: theme.colors.backgroundLight, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>The Social Epicurean</Text>
+        {navigation.canGoBack() ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={24} color={theme.colors.textPrimary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerIconSpacer} />
+        )}
       </View>
 
-      <FlatList
-        ListHeaderComponent={
-          <>
-            {/* Profile Header */}
-            <View style={styles.profileHeader}>
-              <LinearGradient
-                colors={[tokens.colors.primary, '#FF8555']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>{initials}</Text>
-              </LinearGradient>
-              <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{name}</Text>
+      <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
+        {/* Profile Section */}
+        <View style={styles.profileSection}>
+          {/* Avatar */}
+          <LinearGradient
+            colors={[tokens.colors.primary, '#FF3D00']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
+          >
+            <Text style={styles.avatarText}>{initials}</Text>
+          </LinearGradient>
 
-              {/* Preferences Section */}
-              {(state.userProfile?.favoriteCuisine || state.userProfile?.favoriteFood) && (
-                <View style={styles.preferencesSection}>
-                  <View style={styles.preferencesRowWithEdit}>
-                    <View style={styles.preferencesRow}>
-                      {state.userProfile?.favoriteCuisine && (
-                        <View style={[styles.preferenceChip, { backgroundColor: tokens.colors.primaryTint, borderColor: tokens.colors.border }]}>
-                          <Text style={styles.preferenceEmoji}>🍳</Text>
-                          <Text style={[styles.preferenceText, { color: tokens.colors.primary }]}>
-                            {state.userProfile.favoriteCuisine}
-                          </Text>
-                        </View>
-                      )}
-                      {state.userProfile?.favoriteFood && (
-                        <View style={[styles.preferenceChip, { backgroundColor: tokens.colors.primaryTint, borderColor: tokens.colors.border }]}>
-                          <Text style={styles.preferenceEmoji}>🍽️</Text>
-                          <Text style={[styles.preferenceText, { color: tokens.colors.primary }]}>
-                            {state.userProfile.favoriteFood}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <TouchableOpacity onPress={handleOpenEditPrefs} style={styles.editPrefsBtn}>
-                      <Text style={styles.editPrefsBtnText}>✏️</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              {/* Bio Section */}
-              <View style={styles.bioSection}>
-                {!editingBio ? (
-                  <TouchableOpacity
-                    style={[styles.bioContainer, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}
-                    onPress={() => setEditingBio(true)}
-                  >
-                    <Text style={[styles.bioText, { color: theme.colors.textSecondary }]}>
-                      {bioText || 'Add a bio... ✏️'}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.bioEditContainer}>
-                    <TextInput
-                      style={[styles.bioInput, { backgroundColor: theme.colors.backgroundLight, color: theme.colors.textPrimary, borderColor: tokens.colors.primary }]}
-                      placeholder="Tell us about yourself..."
-                      placeholderTextColor={theme.colors.textTertiary}
-                      multiline
-                      value={bioText}
-                      onChangeText={setBioText}
-                      editable={!savingBio}
-                    />
-                    <View style={styles.bioBtnRow}>
-                      <TouchableOpacity
-                        style={styles.bioBtn}
-                        onPress={handleSaveBio}
-                        disabled={savingBio}
-                      >
-                        {savingBio ? (
-                          <ActivityIndicator size="small" color={tokens.colors.primary} />
-                        ) : (
-                          <Text style={styles.bioBtnText}>Save</Text>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.bioBtn, styles.bioBtnCancel, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}
-                        onPress={handleCancelBio}
-                        disabled={savingBio}
-                      >
-                        <Text style={[styles.bioBtnTextCancel, { color: theme.colors.textPrimary }]}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              {/* Stats */}
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>{posts.length}</Text>
-                  <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>Posts</Text>
-                </View>
-                <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>{reviews.length}</Text>
-                  <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>Reviews</Text>
-                </View>
-                <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
-                <View style={styles.statItem}>
-                  <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>{bookmarks.length}</Text>
-                  <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>Saved</Text>
-                </View>
-              </View>
+          {/* Name + PRO Badge */}
+          <View style={styles.nameRow}>
+            <Text style={[styles.profileName, { color: theme.colors.textPrimary }]}>{name}</Text>
+            <View style={styles.proBadge}>
+              <Text style={styles.proBadgeText}>PRO</Text>
             </View>
-
-            {/* Tabs */}
-            <View style={[styles.tabsContainer, { borderBottomColor: theme.colors.border }]}>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'posts' && styles.tabActive]}
-                onPress={() => setActiveTab('posts')}
-              >
-                <Text style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive, { color: activeTab === 'posts' ? tokens.colors.primary : theme.colors.textTertiary }]}>
-                  Posts
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
-                onPress={() => setActiveTab('reviews')}
-              >
-                <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive, { color: activeTab === 'reviews' ? tokens.colors.primary : theme.colors.textTertiary }]}>
-                  Reviews
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, activeTab === 'bookmarks' && styles.tabActive]}
-                onPress={() => setActiveTab('bookmarks')}
-              >
-                <Text style={[styles.tabText, activeTab === 'bookmarks' && styles.tabTextActive, { color: activeTab === 'bookmarks' ? tokens.colors.primary : theme.colors.textTertiary }]}>
-                  Saved
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Feed Header */}
-            <View style={styles.feedContainer}>
-              {loadingFeed && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={tokens.colors.primary} />
-                </View>
-              )}
-
-              {!loadingFeed && activeTab === 'posts' && posts.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyEmoji}>🍴</Text>
-                  <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>No posts yet</Text>
-                  <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Share your food thoughts to get started!</Text>
-                </View>
-              )}
-
-              {!loadingFeed && activeTab === 'reviews' && reviews.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyEmoji}>⭐</Text>
-                  <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>No reviews yet</Text>
-                  <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Write a review to share your experience!</Text>
-                </View>
-              )}
-
-              {!loadingFeed && activeTab === 'bookmarks' && bookmarks.length === 0 && (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyEmoji}>🔖</Text>
-                  <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>No saved restaurants yet</Text>
-                  <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>Bookmark restaurants to save them for later!</Text>
-                </View>
-              )}
-            </View>
-          </>
-        }
-        data={
-          activeTab === 'posts'
-            ? posts
-            : activeTab === 'reviews'
-              ? reviews
-              : bookmarks
-        }
-        keyExtractor={(item) => {
-          if ('emoji' in item) return (item as any).id;
-          if ('rating' in item && 'text' in item) return (item as any).id;
-          return (item as BookmarkedRestaurant).restaurant_id;
-        }}
-        renderItem={({ item }) => {
-          if (activeTab === 'posts') {
-            const post = item as FoodPost & { id: string };
-            return (
-              <View style={styles.feedItem}>
-                <PostCard
-                  emoji={post.emoji}
-                  text={post.text}
-                  restaurantName={post.restaurantName}
-                  createdAt={post.createdAt}
-                />
-              </View>
-            );
-          } else if (activeTab === 'reviews') {
-            const review = item as FoodReview & { id: string };
-            return (
-              <View style={styles.feedItem}>
-                <ReviewCard
-                  restaurantName={review.restaurantName}
-                  rating={review.rating}
-                  text={review.text}
-                  createdAt={review.createdAt}
-                />
-              </View>
-            );
-          } else {
-            const bookmark = item as BookmarkedRestaurant;
-            return (
-              <View style={styles.bookmarkItem}>
-                <View style={[styles.bookmarkCard, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}>
-                  <View style={styles.bookmarkContent}>
-                    <Text style={[styles.bookmarkName, { color: theme.colors.textPrimary }]}>{bookmark.name}</Text>
-                    <Text style={[styles.bookmarkMeta, { color: theme.colors.textSecondary }]}>
-                      {bookmark.rating ? `${bookmark.rating.toFixed(1)} ★` : 'No rating'} • {'$'.repeat(bookmark.price_level || 1)}
-                      {bookmark.distance_meters && (
-                        <>
-                          {' '}
-                          • {bookmark.distance_meters > 1000
-                            ? `${(bookmark.distance_meters / 1000).toFixed(1)}km`
-                            : `${bookmark.distance_meters}m`}
-                        </>
-                      )}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => {
-                      removeBookmarkedRestaurant(userId!, bookmark.restaurant_id);
-                      setBookmarks(bookmarks.filter(b => b.restaurant_id !== bookmark.restaurant_id));
-                    }}
-                    style={styles.removeBookmarkBtn}
-                  >
-                    <Text style={styles.removeBookmarkIcon}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }
-        }}
-        scrollEnabled
-        contentContainerStyle={styles.listContent}
-        ListFooterComponent={<View style={styles.footerSpacer} />}
-      />
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setSheetVisible(true)}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
-
-      {/* Create Post Sheet */}
-      <CreatePostSheet
-        visible={sheetVisible}
-        onClose={() => setSheetVisible(false)}
-        onPostCreated={loadFeed}
-        userId={userId}
-        onCreatePost={handleCreatePost}
-        onCreateReview={handleCreateReview}
-      />
-
-      {/* Settings Menu */}
-      <SettingsMenu
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        onLogout={handleLogoutNav}
-        onNavigateOnboarding={handleNavigateOnboarding}
-      />
-
-      {/* Edit Preferences Modal */}
-      <Modal
-        visible={editingPrefs}
-        transparent
-        animationType="slide"
-        onRequestClose={handleCancelPrefs}
-      >
-        <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.colors.background }]}>
-          {/* Header */}
-          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.textPrimary }]}>Edit Preferences</Text>
-            <TouchableOpacity onPress={handleCancelPrefs}>
-              <Text style={styles.modalCloseBtn}>✕</Text>
-            </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentContainer}>
-            {/* Cuisine Section */}
-            <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionLabel, { color: theme.colors.textPrimary }]}>Favorite Cuisine</Text>
-              <View style={styles.cuisineGrid}>
-                {CUISINES.map((cuisine) => (
-                  <View key={cuisine} style={styles.cuisineChipContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.cuisineChip,
-                        editCuisine === cuisine
-                          ? { backgroundColor: tokens.colors.primary }
-                          : { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border, borderWidth: 1 }
-                      ]}
-                      onPress={() => setEditCuisine(cuisine)}
-                    >
-                      <Text
-                        style={[
-                          styles.cuisineChipText,
-                          editCuisine === cuisine
-                            ? { color: tokens.colors.textInverse }
-                            : { color: theme.colors.textPrimary }
-                        ]}
-                      >
-                        {cuisine}
-                      </Text>
-                    </TouchableOpacity>
+          {/* Bio */}
+          {!editingBio ? (
+            <TouchableOpacity onPress={() => setEditingBio(true)}>
+              <Text style={[styles.bioText, { color: theme.colors.textSecondary }]}>{bioText}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View>
+              <TextInput
+                style={[styles.bioInput, { backgroundColor: theme.colors.backgroundLight, color: theme.colors.textPrimary, borderColor: tokens.colors.primary }]}
+                multiline
+                value={bioText}
+                onChangeText={setBioText}
+                editable={!savingBio}
+              />
+              <View style={styles.bioBtnRow}>
+                <TouchableOpacity style={[styles.bioBtn, { backgroundColor: tokens.colors.primary }]} onPress={handleSaveBio} disabled={savingBio}>
+                  {savingBio ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.bioBtnText}>Save</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.bioBtn, styles.bioCancel]} onPress={() => setEditingBio(false)} disabled={savingBio}>
+                  <Text style={[styles.bioBtnText, { color: theme.colors.textPrimary }]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Stats */}
+          <View style={[styles.statsRow, { borderColor: theme.colors.border }]}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>12</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>REVIEWS</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>45</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>BOOKMARKS</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statNumber, { color: theme.colors.textPrimary }]}>8</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>SOLO SESSIONS</Text>
+            </View>
+          </View>
+
+          {/* Taste Buds */}
+          <View style={[styles.sectionCard, { backgroundColor: theme.colors.backgroundLight }]}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Taste Buds</Text>
+              <TouchableOpacity>
+                <Text style={styles.editLink}>EDIT</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tagsRow}>
+              {['Spicy Ramen', 'Wood-fired Pizza', 'Artisan Coffee', 'Natural Wine'].map((tag) => (
+                <View key={tag} style={[styles.tag, { backgroundColor: tokens.colors.primaryTint, borderColor: tokens.colors.border }]}>
+                  <Text style={[styles.tagText, { color: tokens.colors.primary }]}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Spice Meter */}
+          <View style={[styles.sectionCard, { backgroundColor: theme.colors.backgroundLight }]}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>SPICE LEVEL METER</Text>
+              <Text style={{ color: tokens.colors.primary, fontSize: 12, fontWeight: '600' }}>Extra Hot</Text>
+            </View>
+            <View style={styles.meterTrack}>
+              <View style={[styles.meterFill, { width: '75%' }]} />
+            </View>
+            <View style={styles.meterLabels}>
+              <Text style={[styles.meterLabel, { color: theme.colors.textTertiary }]}>MILD</Text>
+              <Text style={[styles.meterLabel, { color: theme.colors.textTertiary }]}>TINGLING</Text>
+              <Text style={[styles.meterLabel, { color: theme.colors.textTertiary }]}>FIRE</Text>
+            </View>
+          </View>
+
+          {/* Food Preferences from Swipe Likes */}
+          {state.likedDishes && state.likedDishes.length > 0 && (
+            <View style={[styles.sectionCard, { backgroundColor: theme.colors.backgroundLight }]}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Your Food Preferences</Text>
+                <Text style={{ color: tokens.colors.primary, fontSize: 12, fontWeight: '600' }}>
+                  ❤️ {state.likedDishes.length}
+                </Text>
+              </View>
+              <View style={styles.preferencesRow}>
+                {state.likedDishes.slice(0, 4).map((dish, idx) => (
+                  <View key={idx} style={[styles.preferenceTag, { backgroundColor: tokens.colors.primaryTint, borderColor: tokens.colors.border }]}>
+                    <Text style={[styles.preferenceTagText, { color: tokens.colors.primary }]} numberOfLines={1}>
+                      {dish.name.split(' ').slice(0, 2).join(' ')}
+                    </Text>
                   </View>
                 ))}
               </View>
+              <Text style={[styles.preferencesHint, { color: theme.colors.textSecondary }]}>
+                Your recently liked dishes from Swipe
+              </Text>
             </View>
+          )}
+        </View>
 
-            {/* Food Section */}
-            <View style={styles.modalSection}>
-              <Text style={[styles.modalSectionLabel, { color: theme.colors.textPrimary }]}>Favorite Food</Text>
-              <TextInput
-                style={[styles.modalInput, { backgroundColor: theme.colors.backgroundLight, color: theme.colors.textPrimary, borderColor: tokens.colors.primary }]}
-                placeholder="e.g. Adobo, Sushi, Pad Thai..."
-                placeholderTextColor={theme.colors.textTertiary}
-                value={editFood}
-                onChangeText={setEditFood}
-                editable={!savingPrefs}
-              />
-            </View>
-          </ScrollView>
+        {/* Tabs */}
+        <View style={[styles.tabsContainer, { borderBottomColor: theme.colors.border }]}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
+            onPress={() => setActiveTab('reviews')}
+          >
+            <Text style={[styles.tabText, activeTab === 'reviews' && { color: tokens.colors.primary }]}>My Reviews</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'bookmarks' && styles.tabActive]}
+            onPress={() => setActiveTab('bookmarks')}
+          >
+            <Text style={[styles.tabText, activeTab === 'bookmarks' && { color: tokens.colors.primary }]}>Saved Gems</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Buttons */}
-          <View style={[styles.modalBtnRow, { borderTopColor: theme.colors.border }]}>
-            <TouchableOpacity
-              style={[styles.modalBtn, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border, borderWidth: 1 }]}
-              onPress={handleCancelPrefs}
-              disabled={savingPrefs}
-            >
-              <Text style={[styles.modalBtnTextCancel, { color: theme.colors.textPrimary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalBtn, { backgroundColor: tokens.colors.primary }]}
-              onPress={handleSavePrefs}
-              disabled={savingPrefs || !editCuisine || !editFood.trim()}
-            >
-              {savingPrefs ? (
-                <ActivityIndicator size="small" color={tokens.colors.textInverse} />
-              ) : (
-                <Text style={styles.modalBtnText}>Save</Text>
-              )}
-            </TouchableOpacity>
+        {/* Content */}
+        {loading && <ActivityIndicator size="large" color={tokens.colors.primary} style={styles.loader} />}
+
+        {!loading && activeTab === 'bookmarks' && (
+          <View>
+            {bookmarks.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyEmoji}>🔖</Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>No saved restaurants yet</Text>
+              </View>
+            ) : (
+              bookmarks.map((bookmark) => (
+                <View key={bookmark.restaurant_id} style={[styles.itemCard, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}>
+                  <View style={styles.itemContent}>
+                    <Text style={[styles.itemName, { color: theme.colors.textPrimary }]}>{bookmark.name}</Text>
+                    <Text style={[styles.itemMeta, { color: theme.colors.textSecondary }]}>
+                      {bookmark.rating?.toFixed(1) || '0'} ★ • {'$'.repeat(bookmark.price_level || 1)}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
-        </SafeAreaView>
-      </Modal>
+        )}
+
+        {!loading && activeTab === 'reviews' && (
+          <View>
+            {reviews.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyEmoji}>⭐</Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textPrimary }]}>No reviews yet</Text>
+              </View>
+            ) : (
+              reviews.map((review) => (
+                <View key={review.id} style={[styles.itemCard, { backgroundColor: theme.colors.backgroundLight, borderColor: theme.colors.border }]}>
+                  <View style={styles.itemContent}>
+                    <Text style={[styles.itemName, { color: theme.colors.textPrimary }]}>{review.restaurantName}</Text>
+                    <View style={styles.starRow}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Text key={i} style={{ color: i < (review.rating || 0) ? tokens.colors.primary : theme.colors.border, fontSize: 12 }}>
+                          ★
+                        </Text>
+                      ))}
+                    </View>
+                    <Text numberOfLines={2} style={[styles.reviewText, { color: theme.colors.textSecondary }]}>
+                      {review.text}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
-  topBar: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    borderBottomWidth: 1
+    paddingVertical: tokens.spacing.lg,
+    borderBottomWidth: 1,
   },
-  topBarTitle: {
-    fontSize: 18,
-    fontWeight: '700'
+  headerIconSpacer: {
+    width: 24,
+    height: 24,
   },
-  hamburgerButton: {
-    padding: tokens.spacing.sm
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
   },
-  hamburgerIcon: {
-    fontSize: 24,
-    color: tokens.colors.primary
+  content: {
+    flex: 1,
   },
-  listContent: {
-    paddingBottom: tokens.spacing.xxxl
-  },
-  profileHeader: {
-    alignItems: 'center',
-    paddingHorizontal: tokens.spacing.xl,
-    paddingTop: tokens.spacing.lg,
-    paddingBottom: tokens.spacing.lg
-  },
-  preferencesSection: {
-    width: '100%',
-    marginBottom: tokens.spacing.lg
-  },
-  preferencesRowWithEdit: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: tokens.spacing.md
-  },
-  preferencesRow: {
-    flexDirection: 'row',
-    gap: tokens.spacing.md,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    flex: 1
-  },
-  editPrefsBtn: {
-    padding: tokens.spacing.sm
-  },
-  editPrefsBtnText: {
-    fontSize: 18
-  },
-  preferenceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: tokens.spacing.sm,
+  profileSection: {
     paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radius.md,
-    borderWidth: 1,
-    ...tokens.shadows.sm
-  },
-  preferenceEmoji: {
-    fontSize: 16
-  },
-  preferenceText: {
-    fontSize: 14,
-    fontWeight: '600'
+    paddingVertical: tokens.spacing.xl,
+    alignItems: 'center',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: tokens.spacing.lg,
-    ...tokens.shadows.lg
   },
   avatarText: {
     fontSize: 32,
     fontWeight: '700',
-    color: tokens.colors.textInverse
+    color: tokens.colors.textInverse,
+    letterSpacing: 1,
   },
-  name: {
-    fontSize: 28,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.md,
+  },
+  profileName: {
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: -0.5,
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.md
+    marginRight: tokens.spacing.md,
   },
-  bioSection: {
-    width: '100%',
-    marginBottom: tokens.spacing.lg
+  proBadge: {
+    backgroundColor: tokens.colors.primary,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs,
+    borderRadius: tokens.radius.full,
   },
-  bioContainer: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.md,
-    padding: tokens.spacing.lg,
-    borderWidth: 1,
-    borderColor: tokens.colors.border,
-    ...tokens.shadows.sm
+  proBadgeText: {
+    color: tokens.colors.textInverse,
+    fontWeight: '700',
+    fontSize: 10,
   },
   bioText: {
     fontSize: 14,
-    color: tokens.colors.textSecondary,
-    lineHeight: 20
-  },
-  bioEditContainer: {
-    gap: tokens.spacing.md
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: tokens.spacing.lg,
   },
   bioInput: {
-    backgroundColor: tokens.colors.backgroundLight,
-    borderRadius: tokens.radius.md,
     borderWidth: 1,
-    borderColor: tokens.colors.primary,
-    padding: tokens.spacing.lg,
-    fontSize: 14,
-    color: tokens.colors.textPrimary,
-    minHeight: 80
+    borderRadius: tokens.radius.md,
+    padding: tokens.spacing.md,
+    minHeight: 80,
+    marginBottom: tokens.spacing.md,
   },
   bioBtnRow: {
     flexDirection: 'row',
-    gap: tokens.spacing.md
+    gap: tokens.spacing.sm,
   },
   bioBtn: {
     flex: 1,
-    backgroundColor: tokens.colors.primary,
-    borderRadius: tokens.radius.md,
     paddingVertical: tokens.spacing.md,
-    alignItems: 'center'
+    borderRadius: tokens.radius.md,
+    alignItems: 'center',
   },
-  bioBtnCancel: {
-    backgroundColor: tokens.colors.backgroundLight,
+  bioCancel: {
     borderWidth: 1,
-    borderColor: tokens.colors.border
+    borderColor: tokens.colors.border,
   },
   bioBtnText: {
     color: tokens.colors.textInverse,
     fontWeight: '600',
-    fontSize: 14
-  },
-  bioBtnTextCancel: {
-    color: tokens.colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 14
   },
   statsRow: {
+    width: '100%',
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: tokens.spacing.xxl,
-    paddingVertical: tokens.spacing.lg
+    borderWidth: 1,
+    borderRadius: tokens.radius.md,
+    marginBottom: tokens.spacing.xl,
+    overflow: 'hidden',
   },
   statItem: {
-    alignItems: 'center'
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: tokens.spacing.lg,
   },
   statNumber: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: tokens.colors.textPrimary
   },
   statLabel: {
-    fontSize: 12,
-    color: tokens.colors.textTertiary,
-    marginTop: tokens.spacing.xs
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    marginTop: tokens.spacing.xs,
   },
   statDivider: {
     width: 1,
-    height: 30,
-    backgroundColor: tokens.colors.border
+    height: '100%',
+  },
+  sectionCard: {
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
+    ...tokens.shadows.sm,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: tokens.spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  editLink: {
+    color: tokens.colors.primary,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: tokens.spacing.sm,
+  },
+  tag: {
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.full,
+    borderWidth: 1,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  meterTrack: {
+    height: 8,
+    backgroundColor: tokens.colors.primaryTint,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: tokens.spacing.md,
+  },
+  meterFill: {
+    height: '100%',
+    backgroundColor: tokens.colors.primary,
+  },
+  meterLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  meterLabel: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: tokens.spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: tokens.colors.border,
-    marginBottom: tokens.spacing.lg
+    borderBottomWidth: 2,
+    marginBottom: tokens.spacing.lg,
+    paddingHorizontal: tokens.spacing.lg,
   },
   tab: {
     flex: 1,
-    paddingVertical: tokens.spacing.lg,
     alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent'
+    paddingVertical: tokens.spacing.md,
   },
   tabActive: {
-    borderBottomColor: tokens.colors.primary
+    borderBottomWidth: 2.5,
+    borderBottomColor: tokens.colors.primary,
   },
   tabText: {
-    fontSize: 16,
     fontWeight: '600',
-    color: tokens.colors.textTertiary
+    fontSize: 14,
   },
-  tabTextActive: {
-    color: tokens.colors.primary
-  },
-  feedContainer: {
-    paddingHorizontal: tokens.spacing.xl
-  },
-  feedItem: {
-    paddingHorizontal: tokens.spacing.xl
-  },
-  loadingContainer: {
-    paddingVertical: tokens.spacing.xxxl,
-    justifyContent: 'center',
-    alignItems: 'center'
+  loader: {
+    marginVertical: tokens.spacing.xl,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: tokens.spacing.xxxl
+    paddingVertical: tokens.spacing.xxl,
   },
   emptyEmoji: {
     fontSize: 48,
-    marginBottom: tokens.spacing.lg
+    marginBottom: tokens.spacing.md,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: tokens.colors.textPrimary,
-    marginBottom: tokens.spacing.sm
+    fontWeight: '700',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: tokens.colors.textSecondary
+  itemCard: {
+    borderRadius: tokens.radius.lg,
+    padding: tokens.spacing.lg,
+    marginHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
+    borderWidth: 1,
+    ...tokens.shadows.sm,
   },
-  footerSpacer: {
-    height: tokens.spacing.xxxl
+  itemContent: {
+    flex: 1,
   },
-  fab: {
-    position: 'absolute',
-    bottom: tokens.spacing.xxl,
-    right: tokens.spacing.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: tokens.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...tokens.shadows.lg
-  },
-  fabText: {
-    fontSize: 32,
-    color: tokens.colors.textInverse,
-    fontWeight: '600',
-    lineHeight: 36
-  },
-  modalContainer: {
-    flex: 1
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    borderBottomWidth: 1
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700'
-  },
-  modalCloseBtn: {
-    fontSize: 24,
-    color: tokens.colors.primary
-  },
-  modalContent: {
-    flex: 1
-  },
-  modalContentContainer: {
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.lg
-  },
-  modalSection: {
-    marginBottom: tokens.spacing.xl
-  },
-  modalSectionLabel: {
+  itemName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: tokens.spacing.md
+    marginBottom: tokens.spacing.xs,
   },
-  cuisineGrid: {
+  itemMeta: {
+    fontSize: 12,
+    marginBottom: tokens.spacing.sm,
+  },
+  reviewText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 2,
+    marginBottom: tokens.spacing.sm,
+  },
+  preferencesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: tokens.spacing.md
-  },
-  cuisineChipContainer: {
-    width: '50%',
-    paddingRight: tokens.spacing.sm
-  },
-  cuisineChip: {
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    borderRadius: tokens.radius.md,
-    alignItems: 'center'
-  },
-  cuisineChipText: {
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderRadius: tokens.radius.md,
-    paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.md,
-    fontSize: 14,
-    minHeight: 50
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
     gap: tokens.spacing.md,
+    marginBottom: tokens.spacing.lg,
+  },
+  preferenceTag: {
     paddingHorizontal: tokens.spacing.lg,
-    paddingVertical: tokens.spacing.lg,
-    borderTopWidth: 1
-  },
-  modalBtn: {
-    flex: 1,
-    borderRadius: tokens.radius.md,
-    paddingVertical: tokens.spacing.md,
-    alignItems: 'center'
-  },
-  modalBtnText: {
-    color: tokens.colors.textInverse,
-    fontWeight: '600',
-    fontSize: 14
-  },
-  modalBtnTextCancel: {
-    fontWeight: '600',
-    fontSize: 14
-  },
-  bookmarkItem: {
-    paddingHorizontal: tokens.spacing.xl,
-    marginBottom: tokens.spacing.md
-  },
-  bookmarkCard: {
-    borderRadius: tokens.radius.md,
-    padding: tokens.spacing.lg,
+    paddingVertical: tokens.spacing.sm,
+    borderRadius: tokens.radius.full,
     borderWidth: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    ...tokens.shadows.sm
+    gap: tokens.spacing.sm,
   },
-  bookmarkContent: {
-    flex: 1
+  preferenceTagText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
-  bookmarkName: {
-    fontSize: 15,
+  preferenceCount: {
+    fontSize: 12,
     fontWeight: '700',
-    marginBottom: tokens.spacing.xs
   },
-  bookmarkMeta: {
-    fontSize: 13,
-    fontWeight: '500'
+  preferencesHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: tokens.spacing.sm,
   },
-  removeBookmarkBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: tokens.spacing.md
-  },
-  removeBookmarkIcon: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: tokens.colors.textTertiary
-  }
 });

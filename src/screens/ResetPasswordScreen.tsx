@@ -25,7 +25,11 @@ export function ResetPasswordScreen({ route, navigation }: Props) {
     setLoading(false);
 
     if (error) {
-      Alert.alert('Error', error.message || 'Failed to send reset email');
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String(error.message)
+          : 'Failed to send reset email';
+      Alert.alert('Error', message);
       return;
     }
 

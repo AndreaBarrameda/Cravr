@@ -7,6 +7,10 @@ import { useAppState } from '../state/AppStateContext';
 
 type Props = NativeStackScreenProps<DiscoverStackParamList, 'CuisineSelection'>;
 
+type CuisineSelectionParams = DiscoverStackParamList['CuisineSelection'] & {
+  cravingText?: string;
+};
+
 const FALLBACK_CUISINES = [
   { slug: 'oriental', name: 'Oriental' },
   { slug: 'italian', name: 'Italian' },
@@ -19,7 +23,8 @@ const FALLBACK_CUISINES = [
 export function CuisineSelectionScreen({ navigation, route }: Props) {
   const { state, setState } = useAppState();
   const suggested = state.craving?.suggested_cuisines ?? [];
-  const cravingText = route.params?.cravingText || state.craving?.normalized || '';
+  const params = route.params as CuisineSelectionParams;
+  const cravingText = params.cravingText || state.craving?.normalized || '';
 
   const cuisines =
     suggested.length > 0
@@ -95,4 +100,3 @@ const styles = StyleSheet.create({
     color: '#161616'
   }
 });
-
