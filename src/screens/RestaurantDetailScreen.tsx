@@ -40,7 +40,7 @@ type RestaurantData = {
   address: string;
   phone: string;
   hours: string;
-  distance_meters: number;
+  distance_meters: number | null;
   vibe_tags: string[];
   latitude?: number;
   longitude?: number;
@@ -54,12 +54,21 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [sortBy, setSortBy] = useState<'distance' | 'price' | 'rating'>('distance');
+  const [isLoading, setIsLoading] = useState(true);
+
+  const formatDistance = (distanceMeters?: number | null) => {
+    if (distanceMeters == null) return '—';
+    return distanceMeters < 1000
+      ? `${Math.round(distanceMeters)} m`
+      : `${(distanceMeters / 1000).toFixed(1)} km`;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const lat = state.location?.latitude ?? 34.0522;
         const lng = state.location?.longitude ?? -118.2437;
+        setIsLoading(true);
 
         // Load bookmark state
         if (state.authUser?.id) {
@@ -73,7 +82,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         const placeId = restaurantId.replace(/^rst_/, '');
 
         // Load details in background (non-blocking)
-        api.getRestaurantDetails(placeId).then((detailsData) => {
+        api.getRestaurantDetails(placeId, { lat, lng }).then((detailsData) => {
           if (detailsData) {
             setRestaurantData(detailsData);
           }
@@ -104,6 +113,8 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
         }
       } catch (e) {
         console.error('Failed to fetch restaurant data:', e);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -135,7 +146,7 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
           name: restaurantData.name,
           rating: restaurantData.rating,
           price_level: restaurantData.price_level,
-          distance_meters: restaurantData.distance_meters,
+          distance_meters: restaurantData.distance_meters ?? undefined,
           hero_photo_url: restaurantData.hero_photo_url || undefined
         });
         setIsBookmarked(true);
@@ -196,6 +207,28 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
             <Ionicons name="chevron-forward" size={16} color={tokens.colors.textSecondary} />
           </TouchableOpacity>
         </View>
+
+        {restaurantData && (
+          <View style={styles.restaurantMetaCard}>
+            <Text style={styles.restaurantMetaLine} numberOfLines={1}>
+              {restaurantData.address || 'Address unavailable'}
+            </Text>
+            <View style={styles.restaurantMetaRow}>
+              <Text style={styles.restaurantMetaValue}>{formatDistance(restaurantData.distance_meters)}</Text>
+              <Text style={styles.metaDot}>•</Text>
+              <Text style={styles.restaurantMetaValue}>
+                {restaurantData.phone && restaurantData.phone !== 'N/A' ? restaurantData.phone : 'Phone unavailable'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {isLoading && !selectedDish && (
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="small" color={tokens.colors.primary} />
+            <Text style={styles.loadingText}>Loading dishes nearby...</Text>
+          </View>
+        )}
 
         {/* Featured Match Card */}
         {selectedDish && (
@@ -278,15 +311,11 @@ export function RestaurantDetailScreen({ route, navigation }: Props) {
                   <Text style={styles.cravingName}>{dish.name}</Text>
                   <View style={styles.cravingMeta}>
                     <Text style={styles.cravingRating}>
-                      ★ {(Math.random() * 0.5 + 4).toFixed(1)}
+                      ★ {(restaurantData?.rating || 4.2).toFixed(1)}
                     </Text>
                     <Text style={styles.metaDot}>•</Text>
                     <Text style={styles.cravingDistance}>
-                      {restaurantData?.distance_meters
-                        ? restaurantData.distance_meters < 1000
-                          ? `${Math.round(restaurantData.distance_meters)} m`
-                          : `${(restaurantData.distance_meters / 1000).toFixed(1)} km`
-                        : '—'}
+                      {formatDistance(restaurantData?.distance_meters)}
                     </Text>
                     <Text style={styles.metaDot}>•</Text>
                     <Text style={styles.cravingTag}>
@@ -350,6 +379,46 @@ const styles = StyleSheet.create({
   },
   filterTabTextActive: {
     color: tokens.colors.textInverse,
+  },
+  restaurantMetaCard: {
+    marginHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.lg,
+    padding: tokens.spacing.lg,
+    borderRadius: tokens.radius.lg,
+    backgroundColor: tokens.colors.backgroundLight,
+    ...tokens.shadows.sm,
+  },
+  restaurantMetaLine: {
+    fontSize: tokens.typography.body.fontSize,
+    fontWeight: '500',
+    color: tokens.colors.textHeading,
+    marginBottom: tokens.spacing.sm,
+  },
+  restaurantMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.xs,
+  },
+  restaurantMetaValue: {
+    fontSize: tokens.typography.caption.fontSize,
+    fontWeight: '600',
+    color: tokens.colors.textSecondary,
+  },
+  loadingCard: {
+    marginHorizontal: tokens.spacing.lg,
+    marginBottom: tokens.spacing.xl,
+    paddingVertical: tokens.spacing.xxl,
+    borderRadius: tokens.radius.lg,
+    backgroundColor: tokens.colors.backgroundLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacing.md,
+    ...tokens.shadows.sm,
+  },
+  loadingText: {
+    fontSize: tokens.typography.body.fontSize,
+    fontWeight: '500',
+    color: tokens.colors.textSecondary,
   },
   featuredCard: {
     marginHorizontal: tokens.spacing.lg,

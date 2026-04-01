@@ -102,8 +102,11 @@ export const api = {
     });
   },
 
-  getRestaurantDetails(placeId: string) {
-    return request(`/discovery/restaurants/${placeId}`);
+  getRestaurantDetails(placeId: string, location?: { lat: number; lng: number }) {
+    const query = location
+      ? `?lat=${encodeURIComponent(location.lat)}&lng=${encodeURIComponent(location.lng)}`
+      : '';
+    return request(`/discovery/restaurants/${placeId}${query}`);
   },
 
   discoverDishesByAttributes(params: {

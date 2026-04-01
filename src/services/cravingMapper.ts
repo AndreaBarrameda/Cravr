@@ -97,15 +97,12 @@ const CRAVING_MAPPINGS: Record<string, string[]> = {
   'tapas': ['tapas', 'spanish'],
   'wings': ['wings', 'chicken', 'american'],
   'ribs': ['ribs', 'bbq'],
-  'pho': ['pho', 'vietnamese'],
   'banh mi': ['banh mi', 'vietnamese'],
   'kebab': ['kebab', 'middle eastern'],
   'gyro': ['gyro', 'greek'],
 
   // MISC
   'fast food': ['fast food', 'burger'],
-  'pizza': ['pizza', 'italian'],
-  'italian': ['italian', 'pizza', 'pasta'],
 };
 
 /**
