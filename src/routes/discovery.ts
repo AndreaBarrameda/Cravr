@@ -118,6 +118,63 @@ function inferDishTraits(name: string, description: string) {
   return { temperature, flavor, texture, intensity };
 }
 
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getDistanceMeters(
+  origin: { lat?: number; lng?: number } | undefined,
+  geometry: { location?: { lat?: number; lng?: number } } | undefined
+): number | null {
+  if (!origin?.lat || !origin?.lng || !geometry?.location?.lat || !geometry?.location?.lng) {
+    return null;
+  }
+
+  return Math.round(
+    getDistanceKm(origin.lat, origin.lng, geometry.location.lat, geometry.location.lng) * 1000
+  );
+}
+
+function getProximityBoost(distanceMeters: number | null): number {
+  if (distanceMeters == null) return 0;
+  if (distanceMeters <= 150) return 0.38;
+  if (distanceMeters <= 350) return 0.3;
+  if (distanceMeters <= 600) return 0.22;
+  if (distanceMeters <= 1000) return 0.14;
+  if (distanceMeters <= 1800) return 0.08;
+  if (distanceMeters <= 3000) return 0.03;
+  return 0;
+}
+
+function mergeUniquePlaces(...groups: any[][]): any[] {
+  return Array.from(
+    new Map(groups.flat().map((place) => [place.place_id, place])).values()
+  );
+}
+
+function getBroadFoodQueries(baseKeyword?: string): string[] {
+  const queries = [
+    baseKeyword || 'restaurant',
+    'restaurants',
+    'cafes and restaurants',
+    'food places',
+    'food stall',
+    'food court',
+    'restaurants in mall',
+    'kiosk food',
+    'quick bites'
+  ];
+
+  return Array.from(new Set(queries.filter(Boolean)));
+}
+
 function getCachedDescription(id: string): RestaurantDescription | null {
   const cached = descriptionCache.get(id);
 
@@ -198,7 +255,12 @@ discoveryRouter.post('/restaurants', async (req, res) => {
 
     // Filter restaurants to ensure they match the craving/keyword
     // Check if restaurant's types include relevant categories
-    const relevantTypes = new Set(['restaurant', 'food', 'cafe', 'bakery', 'dessert', 'noodle', 'ramen', 'sushi', 'japanese', 'thai', 'indian', 'mexican', 'pizza', 'burger', 'seafood', 'chinese', 'korean', 'vietnamese', 'italian', 'breakfast', 'brunch']);
+    const relevantTypes = new Set([
+      'restaurant', 'food', 'cafe', 'bakery', 'dessert', 'meal_takeaway', 'meal_delivery',
+      'food_court', 'store', 'noodle', 'ramen', 'sushi', 'japanese', 'thai', 'indian',
+      'mexican', 'pizza', 'burger', 'seafood', 'chinese', 'korean', 'vietnamese',
+      'italian', 'breakfast', 'brunch'
+    ]);
 
     restaurants = restaurants.filter((r: any) => {
       const types = (r.types ?? []).map((t: string) => t.toLowerCase());
@@ -207,33 +269,43 @@ discoveryRouter.post('/restaurants', async (req, res) => {
       return isFood;
     });
 
-    // If we got very few results, expand search radius
-    if (restaurants.length < 10) {
-      // eslint-disable-next-line no-console
-      console.log(`📍 Got ${restaurants.length} results, expanding radius to get more`);
-      maps = await mapsClient.nearbySearch({
-        lat: location.lat,
-        lng: location.lng,
-        radius: Math.min(radius_meters * 2, 8000), // Double radius, max 8km
-        keyword
-      });
-      restaurants = (maps.results ?? []).filter((r: any) => {
-        const types = (r.types ?? []).map((t: string) => t.toLowerCase());
-        const isFood = types.some(t => relevantTypes.has(t) || t.includes('restaurant') || t.includes('cafe') || t.includes('food'));
-        return isFood;
-      });
+    if (restaurants.length < 24) {
+      const supplementalQueries = getBroadFoodQueries(keyword).slice(1);
+      const textResults = await Promise.all(
+        supplementalQueries.map(async (query) => {
+          try {
+            const response = await mapsClient.textSearch({
+              query,
+              location: { lat: location.lat, lng: location.lng },
+              radius: Math.min(radius_meters * 2, 5000)
+            });
+            return response.results ?? [];
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      restaurants = mergeUniquePlaces(restaurants, ...textResults);
     }
 
-    // Helper function to calculate distance in km using Haversine formula
-    function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-      const R = 6371; // Earth's radius in km
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLng = (lng2 - lng1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLng/2) * Math.sin(dLng/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
+    restaurants = restaurants.filter((r: any) => {
+      const types = (r.types ?? []).map((t: string) => t.toLowerCase());
+      return types.some((t) => relevantTypes.has(t) || t.includes('restaurant') || t.includes('cafe') || t.includes('food'));
+    });
+
+    restaurants = restaurants
+      .map((r: any) => {
+        const distanceMeters = getDistanceMeters(location, r.geometry);
+        const ratingScore = (r.rating || 0) / 5;
+        const reviewScore = Math.min((r.user_ratings_total || 0) / 500, 1) * 0.35;
+        const score = ratingScore * 0.55 + reviewScore + getProximityBoost(distanceMeters);
+        return { ...r, _distanceMeters: distanceMeters, _rankScore: score };
+      })
+      .sort((a: any, b: any) => b._rankScore - a._rankScore);
+
+    function getDistanceMetersForPlace(r: any): number | null {
+      return r._distanceMeters ?? getDistanceMeters(location, r.geometry);
     }
 
     // Helper function to map Google Maps price_level to average peso price
@@ -272,16 +344,7 @@ discoveryRouter.post('/restaurants', async (req, res) => {
         );
 
         // Calculate distance from user
-        let distanceMeters: number | null = null;
-        if (r.geometry?.location) {
-          const distanceKm = getDistanceKm(location.lat, location.lng, r.geometry.location.lat, r.geometry.location.lng);
-          distanceMeters = Math.round(distanceKm * 1000);
-          // eslint-disable-next-line no-console
-          console.log(`📍 ${r.name}: ${distanceMeters}m (${(distanceMeters/1000).toFixed(1)}km)`);
-        } else {
-          // eslint-disable-next-line no-console
-          console.warn(`⚠️ No geometry for ${r.name}`, r.geometry);
-        }
+        const distanceMeters = getDistanceMetersForPlace(r);
 
         return {
           restaurant_id: `rst_${r.place_id}`,
@@ -493,6 +556,26 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
         restaurants.push(...(fallbackMaps.results ?? []));
       }
 
+      if (restaurants.length < 24) {
+        const supplementalQueries = getBroadFoodQueries(keyword);
+        const textResults = await Promise.all(
+          supplementalQueries.map(async (query) => {
+            try {
+              const response = await mapsClient.textSearch({
+                query,
+                location: { lat: location.lat, lng: location.lng },
+                radius: 5000
+              });
+              return response.results ?? [];
+            } catch {
+              return [];
+            }
+          })
+        );
+
+        restaurants = mergeUniquePlaces(restaurants, ...textResults);
+      }
+
       // Cache the results for 30 minutes (use craving_text for better cache key)
       cacheRestaurants(location.lat, location.lng, craving_text || cuisine, restaurants);
     }
@@ -531,10 +614,22 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
     const hasActiveAttributes = hasMeaningfulAttributes(attributes);
     const hasSpecificCravingText = Boolean(craving_text && craving_text.trim() && craving_text.trim().toLowerCase() !== 'popular dishes');
 
-    // Shuffle restaurants to provide variety even with cached results
-    // This ensures different requests return different restaurants/dishes
-    const shuffled = [...restaurants].sort(() => Math.random() - 0.5);
-    // Select more restaurants so swipe-style surfaces have a deeper pool
+    const rankedRestaurants = restaurants
+      .map((restaurant: any) => {
+        const distanceMeters = getDistanceMeters(location, restaurant.geometry);
+        const qualityScore = ((restaurant.rating || 4) / 5) * 0.45;
+        const popularityScore = Math.min((restaurant.user_ratings_total || 0) / 800, 1) * 0.18;
+        const proximityScore = getProximityBoost(distanceMeters);
+        return {
+          ...restaurant,
+          _distanceMeters: distanceMeters,
+          _selectionScore: qualityScore + popularityScore + proximityScore + Math.random() * 0.06
+        };
+      })
+      .sort((a: any, b: any) => b._selectionScore - a._selectionScore);
+
+    const topRestaurantPool = rankedRestaurants.slice(0, Math.min(24, rankedRestaurants.length));
+    const shuffled = [...topRestaurantPool].sort(() => Math.random() - 0.5);
     const selectedRestaurants = shuffled.slice(0, Math.min(12, shuffled.length));
 
     // eslint-disable-next-line no-console
@@ -582,6 +677,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                   matchScore = 0.55 + ratingBoost + popularityBoost;
                 }
 
+                const distanceMeters = r._distanceMeters ?? getDistanceMeters(location, r.geometry);
                 return {
                   dish_id: `real_${r.place_id}_${item.name.replace(/\s+/g, '_')}`,
                   name: item.name,
@@ -596,8 +692,9 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                   price: item.price,
                   restaurant_id: restaurantId,
                   restaurant_name: r.name,
+                  distance_meters: distanceMeters,
                   rating: r.rating || 4.0,
-                  match_score: Math.min(matchScore, 1.0),
+                  match_score: Math.min(matchScore + getProximityBoost(distanceMeters) * 0.35, 1.0),
                   match_reason: 'Real menu item from the restaurant website',
                   data_source: 'real_menu'
                 };
@@ -702,6 +799,7 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                   }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
                 : null;
 
+              const distanceMeters = r._distanceMeters ?? getDistanceMeters(location, r.geometry);
               return {
                 dish_id: `dsh_${r.place_id}_${dish.name.replace(/\s+/g, '_')}`,
                 name: dish.name,
@@ -712,8 +810,9 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
                 price: dish.price,
                 restaurant_id: restaurantId,
                 restaurant_name: r.name,
+                distance_meters: distanceMeters,
                 rating: r.rating || 4.0,
-                match_score: dish.matchScore,
+                match_score: Math.min(dish.matchScore + getProximityBoost(distanceMeters) * 0.25, 1.0),
                 match_reason: restaurantDescription.tagline, // Use AI tagline as match reason
                 restaurant_description: {
                   tagline: restaurantDescription.tagline,
@@ -781,6 +880,8 @@ discoveryRouter.post('/dishes-by-attributes', async (req, res) => {
 discoveryRouter.get('/restaurants/:place_id', async (req, res) => {
   try {
     const { place_id } = req.params;
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lng);
 
     if (!place_id) {
       return res.status(400).json({ error: 'place_id is required' });
@@ -816,6 +917,11 @@ discoveryRouter.get('/restaurants/:place_id', async (req, res) => {
             place.photos[0].photo_reference
           }&key=${process.env.GOOGLE_MAPS_SERVER_API_KEY}`
         : null,
+      distance_meters: Number.isFinite(lat) && Number.isFinite(lng)
+        ? getDistanceMeters({ lat, lng }, place.geometry)
+        : null,
+      latitude: place.geometry?.location?.lat ?? null,
+      longitude: place.geometry?.location?.lng ?? null,
       types: place.types || []
     });
   } catch (err) {
@@ -843,7 +949,7 @@ discoveryRouter.post('/trending', async (req, res) => {
     const { location, limit = 20, category = 'all' } = req.body as {
       location?: { lat?: number; lng?: number };
       limit?: number;
-      category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest';
+      category?: 'all' | 'garden' | 'city-view' | 'cozy-cafes' | 'fine-dining' | 'newest' | 'mall-food' | 'quick-bites';
     };
 
     if (!location?.lat || !location?.lng) {
@@ -865,6 +971,10 @@ discoveryRouter.post('/trending', async (req, res) => {
       searchQueries = ['cozy cafe', 'intimate restaurant', 'boutique cafe', 'charming cafe'];
     } else if (category === 'fine-dining') {
       searchQueries = ['fine dining', 'upscale restaurant', 'gourmet restaurant', 'michelin restaurant'];
+    } else if (category === 'mall-food') {
+      searchQueries = ['restaurants in mall', 'mall food', 'food court', 'mall cafe'];
+    } else if (category === 'quick-bites') {
+      searchQueries = ['quick bites', 'food stall', 'snack kiosk', 'casual eats'];
     } else if (category === 'newest') {
       searchQueries = ['new restaurant', 'recently opened restaurant', 'trending restaurant', 'popular new place'];
     } else {
@@ -873,7 +983,9 @@ discoveryRouter.post('/trending', async (req, res) => {
         'best restaurants',
         'restaurants',
         'cafes and restaurants',
-        'food places'
+        'food places',
+        'restaurants in mall',
+        'quick bites'
       ];
     }
 
@@ -925,13 +1037,15 @@ discoveryRouter.post('/trending', async (req, res) => {
 
     // Score restaurants by engagement + recency
     const scoredRestaurants = restaurants.map((r: any) => {
+      const distanceMeters = getDistanceMeters(location, r.geometry);
+
       // Engagement score: high ratings + lots of reviews
       const rating = r.rating || 0;
       const reviewCount = r.user_ratings_total || 0;
 
       const ratingScore = rating / 5; // 0-1
       const reviewScore = Math.min(reviewCount / 500, 1); // 0-1, normalize to 500 reviews
-      let engagementScore = (ratingScore * 0.6) + (reviewScore * 0.4); // 60% rating, 40% review count
+      let engagementScore = (ratingScore * 0.52) + (reviewScore * 0.28) + getProximityBoost(distanceMeters); // include proximity
 
       // Boost featured restaurants
       const isFeatured = FEATURED_RESTAURANTS.some(name => r.name?.includes(name));
@@ -941,6 +1055,7 @@ discoveryRouter.post('/trending', async (req, res) => {
 
       return {
         ...r,
+        distance_meters: distanceMeters,
         engagementScore,
         isFeatured,
         isNew: reviewCount < 30 && rating >= 4.0, // Newer with decent rating (4.0+)
@@ -974,6 +1089,7 @@ discoveryRouter.post('/trending', async (req, res) => {
       rating: r.rating || 0,
       price_level: r.price_level || 2,
       review_count: r.user_ratings_total || 0,
+      distance_meters: r.distance_meters,
       isNew: r.isNew,
       isHottest: r.isHottest,
       isFeatured: r.isFeatured,
